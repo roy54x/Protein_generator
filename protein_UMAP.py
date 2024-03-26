@@ -4,40 +4,27 @@ import umap.umap_ as umap
 from matplotlib import pyplot as plt
 
 
-def one_hot_encode_sequence(sequence):
-    # Define the mapping of amino acids to indices
+def encode_sequences(sequences):
     amino_acids = 'ACDEFGHIKLMNPQRSTVWY'
-    aa_to_index = {aa: i for i, aa in enumerate(amino_acids)}
-
-    # Initialize an array of zeros for one-hot encoding
-    num_amino_acids = len(amino_acids)
-    encoding = np.zeros((len(sequence), num_amino_acids))
-
-    # Set the appropriate index to 1 for each amino acid in the sequence
-    for i, aa in enumerate(sequence):
-        if aa in aa_to_index:
-            encoding[i, aa_to_index[aa]] = 1
-        else:
-            # Handle unknown or ambiguous amino acids
-            encoding[i, :] = np.nan
-
-    return encoding
-
-
-def tokenize_sequences_one_hot(sequences):
-    tokens = []
+    encoding = {aa: i / len(amino_acids) for i, aa in enumerate(amino_acids)}
+    encoded_sequences = []
     for sequence in sequences:
-        # One-hot encode each sequence
-        encoded_sequence = one_hot_encode_sequence(sequence)
-        tokens.append(encoded_sequence)
-    return tokens
+        encoded_sequence = [encoding.get(aa, 0.0) for aa in sequence]
+        encoded_sequences.append(encoded_sequence)
+    return encoded_sequences
+
+
+def pad_vectors(vectors):
+    max_length = max(len(v) for v in vectors)
+    padded_vectors = [v + [0.0] * (max_length - len(v)) for v in vectors]
+    return padded_vectors
 
 
 protein_df = pd.read_csv("protein_df.csv")
-sequences = protein_df.sequence
-tokens = tokenize_sequences_one_hot(sequences)
+encoded_sequences = encode_sequences(protein_df.sequence)
+padded_vectors = pad_vectors(encoded_sequences)
 umap_colors = protein_df.organism
 reducer = umap.UMAP(n_neighbors=15)
-embedding = reducer.fit_transform(tokens)
+embedding = reducer.fit_transform(padded_vectors)
 fig, ax = plt.subplots()
 sc = ax.scatter(embedding[:, 0], embedding[:, 1], c=umap_colors, cmap='Spectral', lw=0, alpha=1, s=5)

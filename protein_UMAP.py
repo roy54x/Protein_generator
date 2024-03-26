@@ -16,7 +16,7 @@ def encode_sequences(sequences):
 
 def pad_sequences(sequences):
     max_length = max(len(s) for s in sequences)
-    padded_sequences = [np.array(s + [0.0] * (max_length - len(s))) for s in sequences]
+    padded_sequences = [np.array(s + [-1.0] * (max_length - len(s))) for s in sequences]
     return padded_sequences
 
 
@@ -29,18 +29,20 @@ def encode_values(value_list):
 
 protein_df = pd.read_csv("protein_df.csv")
 top_5_organisms = protein_df['organism'].value_counts().head(5).index.tolist()
-protein_df = protein_df[protein_df['organism'].isin(top_5_organisms)]
+protein_df = protein_df[protein_df['organism'].isin(top_5_organisms)][:2000]
 encoded_sequences = encode_sequences(protein_df.sequence)
 padded_sequences = pad_sequences(encoded_sequences)
-
 encoded_values, value_to_numeric = encode_values(protein_df.organism.to_list())
-reducer = umap.UMAP(n_neighbors=15)
+numeric_to_value = {numeric: value for value, numeric in value_to_numeric.items()}
+
+reducer = umap.UMAP()
 embedding = reducer.fit_transform(padded_sequences)
 fig, ax = plt.subplots()
-sc = ax.scatter(embedding[:, 0], embedding[:, 1], c=encoded_values, cmap='Spectral', lw=0, alpha=1, s=5)
 
-numeric_to_value = {numeric: value for value, numeric in value_to_numeric.items()}
-legend_labels = [numeric_to_value[numeric] for numeric in sorted(value_to_numeric.values())]
-legend = ax.legend(legend_labels, title='Organism', loc='upper right', fontsize='small')
-plt.setp(legend.get_title(), fontsize='medium')
+for numeric, value in numeric_to_value.items():
+    indices = [i for i, v in enumerate(encoded_values) if v == numeric]
+    ax.scatter(embedding[indices, 0], embedding[indices, 1], label=value, cmap='Spectral', s=5)
+ax.legend(title='Organism', loc='upper right', fontsize='small')
 plt.show()
+
+

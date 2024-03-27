@@ -12,13 +12,11 @@ def one_hot_encode_sequence(sequences):
 
     encoded_sequences = []
     for s in sequences:
-        encoding = np.zeros((max_len, num_amino_acids))
+        encoding = np.zeros((max_len, num_amino_acids), dtype="float32")
         for i, aa in enumerate(s):
             if aa in aa_to_index:
-                encoding[i, aa_to_index[aa]] = 1
-            else:
-                encoding[i, :] = np.nan
-        encoded_sequences.append(encoding)
+                encoding[i, aa_to_index[aa]] = 1.0
+        encoded_sequences.append(encoding.flatten())
     return encoded_sequences
 
 
@@ -31,7 +29,7 @@ def encode_values(value_list):
 
 protein_df = pd.read_csv("protein_df.csv")
 top_5_organisms = protein_df['organism'].value_counts().head(5).index.tolist()
-protein_df = protein_df[protein_df['organism'].isin(top_5_organisms)][:500]
+protein_df = protein_df[protein_df['organism'].isin(top_5_organisms)][:1000]
 encoded_sequences = one_hot_encode_sequence(protein_df.sequence)
 encoded_values, value_to_numeric = encode_values(protein_df.organism.to_list())
 numeric_to_value = {numeric: value for value, numeric in value_to_numeric.items()}

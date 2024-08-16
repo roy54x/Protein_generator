@@ -31,9 +31,11 @@ def get_uniprot_dataframe(xml_file):
                                 elem.findall('.//{http://uniprot.org/uniprot}feature')]
 
         try:
-            pdb_files = download_pdb_files_from_uniprot(accession)
-            if pdb_files:
-                structure = parser.get_structure(accession, pdb_files[0])  # Use the first PDB file
+            pdb_ids = fetch_pdb_ids(accession)
+            if pdb_ids:
+                print(sequence)
+                pdb_file = download_pdb(pdb_ids[0])
+                structure = parser.get_structure(pdb_ids[0], pdb_file)  # Use the first PDB file
                 coords = extract_amino_acid_coords(structure)
                 contact_map = get_contact_map_from_coords(coords)
                 structure_info = get_structure_info(structure)
@@ -67,18 +69,6 @@ def get_uniprot_dataframe(xml_file):
             del elem.getparent()[0]
 
     return pd.DataFrame(data)
-
-
-def download_pdb_files_from_uniprot(uniprot_id, pdb_dir='pdb_files'):
-    pdb_ids = fetch_pdb_ids(uniprot_id)
-    if not pdb_ids:
-        return []
-
-    downloaded_files = []
-    for pdb_id in pdb_ids:
-        pdb_path = download_pdb(pdb_id, pdb_dir=pdb_dir)
-        downloaded_files.append(pdb_path)
-    return downloaded_files
 
 
 def fetch_pdb_ids(uniprot_id):
@@ -116,6 +106,7 @@ def extract_amino_acid_coords(structure):
                 # Filter out non-amino acid residues
                 if residue.id[0] == ' ' and 'CA' in residue:
                     ca_atom = residue['CA']
+                    print(seq1(residue.resname))
                     ca_coords.append(ca_atom.get_coord())
     return np.array(ca_coords)
 

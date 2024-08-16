@@ -9,28 +9,7 @@ from lxml import etree
 pdb_list = PDB.PDBList()
 parser = PDB.PDBParser()
 
-amino_acid_letters = [
-    "A",  # Alanine
-    "R",  # Arginine
-    "N",  # Asparagine
-    "D",  # Aspartic Acid
-    "C",  # Cysteine
-    "E",  # Glutamic Acid
-    "Q",  # Glutamine
-    "G",  # Glycine
-    "H",  # Histidine
-    "I",  # Isoleucine
-    "L",  # Leucine
-    "K",  # Lysine
-    "M",  # Methionine
-    "F",  # Phenylalanine
-    "P",  # Proline
-    "S",  # Serine
-    "T",  # Threonine
-    "W",  # Tryptophan
-    "Y",  # Tyrosine
-    "V"   # Valine
-]
+amino_acids = 'ACDEFGHIKLMNPQRSTVWY'
 
 def get_pdb_ids_from_uniprot_xml(xml_file):
     pdb_ids = []
@@ -38,8 +17,6 @@ def get_pdb_ids_from_uniprot_xml(xml_file):
     for event, elem in context:
         accession = elem.findtext('{http://uniprot.org/uniprot}accession')
         pdb_ids.extend(fetch_pdb_ids(accession))
-        if len(pdb_ids) > 10:
-            break
     return list(set(pdb_ids))  # Remove duplicates
 
 
@@ -59,10 +36,10 @@ def fetch_pdb_ids(uniprot_id):
     return pdb_ids
 
 
-def get_pdb_data(pdb_ids):
+def get_pdb_data(pdb_ids, output_path):
     data = []
     for pdb_id in pdb_ids:
-        pdb_file = download_pdb(pdb_id)
+        pdb_file = download_pdb(pdb_id, os.path.join(output_path, 'pdb_files'))
         structure = parser.get_structure(pdb_id, pdb_file)  # Use the first PDB file
         sequence, coords = extract_amino_acid_coords(structure)
         contact_map = get_contact_map_from_coords(coords)
@@ -75,7 +52,9 @@ def get_pdb_data(pdb_ids):
             "contact_map": contact_map,
             "structure_info": structure_info
         })
-    return pd.DataFrame(data)
+    df = pd.DataFrame(data)
+    df.to_csv(os.path.join(output_path, "protein_df.csv"), index=False)
+    return df
 
 
 def download_pdb(pdb_id, pdb_dir='pdb_files'):
@@ -93,7 +72,7 @@ def extract_amino_acid_coords(structure):
             for residue in chain:
                 # Filter out non-amino acid residues
                 letter = seq1(residue.resname)
-                if residue.id[0] == ' ' and 'CA' in residue and letter in amino_acid_letters:
+                if residue.id[0] == ' ' and 'CA' in residue and letter in amino_acids:
                     sequence.append(letter)
                     ca_atom = residue['CA']
                     ca_coords.append(ca_atom.get_coord())
@@ -125,6 +104,5 @@ def get_structure_info(structure):
 
 
 pdb_ids = get_pdb_ids_from_uniprot_xml(r"D:\python project\data\uniprot_sprot.xml\uniprot_sprot.xml")
-df = get_pdb_data(pdb_ids)
-df.to_csv("protein_df.csv", index=False)
+df = get_pdb_data(pdb_ids, output_path=r"D:\python project\data\PDB")
 print(df.head())

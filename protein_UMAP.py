@@ -3,9 +3,10 @@ import pandas as pd
 import umap.umap_ as umap
 from matplotlib import pyplot as plt
 
+from extract_pdb_database import amino_acids
+
 
 def one_hot_encode_sequence(sequences):
-    amino_acids = 'ACDEFGHIKLMNPQRSTVWY'
     aa_to_index = {aa: i for i, aa in enumerate(amino_acids)}
     num_amino_acids = len(amino_acids)
     max_len = max([len(s) for s in sequences])
@@ -27,7 +28,7 @@ def encode_values(value_list):
     return encoded_values, value_to_numeric
 
 
-protein_df = pd.read_csv("protein_df.csv")
+protein_df = pd.read_csv("D:\python project\data\protein_df.csv")
 top_5_organisms = protein_df['organism'].value_counts().head(5).index.tolist()
 protein_df = protein_df[protein_df['organism'].isin(top_5_organisms)][:1000]
 encoded_sequences = one_hot_encode_sequence(protein_df.sequence)

@@ -9,66 +9,38 @@ from lxml import etree
 pdb_list = PDB.PDBList()
 parser = PDB.PDBParser()
 
+amino_acid_letters = [
+    "A",  # Alanine
+    "R",  # Arginine
+    "N",  # Asparagine
+    "D",  # Aspartic Acid
+    "C",  # Cysteine
+    "E",  # Glutamic Acid
+    "Q",  # Glutamine
+    "G",  # Glycine
+    "H",  # Histidine
+    "I",  # Isoleucine
+    "L",  # Leucine
+    "K",  # Lysine
+    "M",  # Methionine
+    "F",  # Phenylalanine
+    "P",  # Proline
+    "S",  # Serine
+    "T",  # Threonine
+    "W",  # Tryptophan
+    "Y",  # Tyrosine
+    "V"   # Valine
+]
 
-def get_uniprot_dataframe(xml_file):
-    data = []
+def get_pdb_ids_from_uniprot_xml(xml_file):
+    pdb_ids = []
     context = etree.iterparse(xml_file, events=('end',), tag='{http://uniprot.org/uniprot}entry')
     for event, elem in context:
         accession = elem.findtext('{http://uniprot.org/uniprot}accession')
-        sequence = elem.findtext('{http://uniprot.org/uniprot}sequence')
-        protein_names = [name.text for name in elem.findall('.//{http://uniprot.org/uniprot}fullName')]
-        organism = elem.findtext('.//{http://uniprot.org/uniprot}organism/{http://uniprot.org/uniprot}name')
-        function = elem.findtext('.//{http://uniprot.org/uniprot}comment[@type="function"]/{http://uniprot.org/uniprot}text')
-        subcellular_location = elem.findtext('.//{http://uniprot.org/uniprot}comment[@type="subcellular location"]/{http://uniprot.org/uniprot}subcellularLocation/{http://uniprot.org/uniprot}location')
-        tissue_specificity = elem.findtext('.//{http://uniprot.org/uniprot}comment[@type="tissue specificity"]/{http://uniprot.org/uniprot}text')
-        domain_structure = [domain.get('description') for domain in
-                            elem.findall('.//{http://uniprot.org/uniprot}feature[@type="domain"]')]
-        ptms = [ptm.get('description') for ptm in
-                elem.findall('.//{http://uniprot.org/uniprot}feature[@type="modified residue"]')]
-        interactions = [interaction.text for interaction in
-                        elem.findall('.//{http://uniprot.org/uniprot}interactant/{http://uniprot.org/uniprot}geneName')]
-        sequence_annotations = [(annot.get('description'), annot.get('evidence')) for annot in
-                                elem.findall('.//{http://uniprot.org/uniprot}feature')]
-
-        try:
-            pdb_ids = fetch_pdb_ids(accession)
-            if pdb_ids:
-                print(sequence)
-                pdb_file = download_pdb(pdb_ids[0])
-                structure = parser.get_structure(pdb_ids[0], pdb_file)  # Use the first PDB file
-                coords = extract_amino_acid_coords(structure)
-                contact_map = get_contact_map_from_coords(coords)
-                structure_info = get_structure_info(structure)
-            else:
-                coords = None
-                contact_map = None
-                structure_info = None
-        except Exception as e:
-            print(f"Error processing {accession}: {e}")
-            contact_map = None
-            structure_info = None
-
-        data.append({
-            'accession': accession,
-            'sequence': sequence,
-            'protein_names': protein_names,
-            'organism': organism,
-            'function': function,
-            'subcellular_location': subcellular_location,
-            'tissue_specificity': tissue_specificity,
-            'domain_structure': domain_structure,
-            'ptms': ptms,
-            'interactions': interactions,
-            'sequence_annotations': sequence_annotations,
-            "coords": coords,
-            "contact_map": contact_map,
-            "structure_info": structure_info
-        })
-        elem.clear()
-        while elem.getprevious() is not None:
-            del elem.getparent()[0]
-
-    return pd.DataFrame(data)
+        pdb_ids.extend(fetch_pdb_ids(accession))
+        if len(pdb_ids) > 10:
+            break
+    return list(set(pdb_ids))  # Remove duplicates
 
 
 def fetch_pdb_ids(uniprot_id):
@@ -84,9 +56,26 @@ def fetch_pdb_ids(uniprot_id):
     for db_reference in tree.findall(".//{http://uniprot.org/uniprot}dbReference[@type='PDB']"):
         pdb_id = db_reference.get('id')
         pdb_ids.append(pdb_id)
-    if pdb_ids:
-        print(pdb_ids)
     return pdb_ids
+
+
+def get_pdb_data(pdb_ids):
+    data = []
+    for pdb_id in pdb_ids:
+        pdb_file = download_pdb(pdb_id)
+        structure = parser.get_structure(pdb_id, pdb_file)  # Use the first PDB file
+        sequence, coords = extract_amino_acid_coords(structure)
+        contact_map = get_contact_map_from_coords(coords)
+        structure_info = get_structure_info(structure)
+
+        data.append({
+            'pdb_id': pdb_id,
+            'sequence': sequence,
+            "coords": coords,
+            "contact_map": contact_map,
+            "structure_info": structure_info
+        })
+    return pd.DataFrame(data)
 
 
 def download_pdb(pdb_id, pdb_dir='pdb_files'):
@@ -97,18 +86,19 @@ def download_pdb(pdb_id, pdb_dir='pdb_files'):
 
 
 def extract_amino_acid_coords(structure):
+    sequence = []
     ca_coords = []
     for model in structure:
         for chain in model:
-            if chain.id != "A":
-                continue
             for residue in chain:
                 # Filter out non-amino acid residues
-                if residue.id[0] == ' ' and 'CA' in residue:
+                letter = seq1(residue.resname)
+                if residue.id[0] == ' ' and 'CA' in residue and letter in amino_acid_letters:
+                    sequence.append(letter)
                     ca_atom = residue['CA']
-                    print(seq1(residue.resname))
                     ca_coords.append(ca_atom.get_coord())
-    return np.array(ca_coords)
+            break
+    return ''.join(sequence), np.array(ca_coords)
 
 
 def get_contact_map_from_coords(ca_coords, threshold=8.0):
@@ -124,6 +114,7 @@ def get_contact_map_from_coords(ca_coords, threshold=8.0):
 
     return contact_map
 
+
 # 5. Function to extract structure info
 def get_structure_info(structure):
     return {
@@ -133,7 +124,7 @@ def get_structure_info(structure):
     }
 
 
-df = get_uniprot_dataframe(r"D:\python project\data\uniprot_sprot.xml\uniprot_sprot.xml")
+pdb_ids = get_pdb_ids_from_uniprot_xml(r"D:\python project\data\uniprot_sprot.xml\uniprot_sprot.xml")
+df = get_pdb_data(pdb_ids)
 df.to_csv("protein_df.csv", index=False)
-
 print(df.head())

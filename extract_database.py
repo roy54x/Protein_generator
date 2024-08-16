@@ -34,7 +34,8 @@ def get_uniprot_dataframe(xml_file):
             pdb_files = download_pdb_files_from_uniprot(accession)
             if pdb_files:
                 structure = parser.get_structure(accession, pdb_files[0])  # Use the first PDB file
-                coords, contact_map = get_coords_and_contact_map(structure)
+                coords = extract_amino_acid_coords(structure)
+                contact_map = get_contact_map_from_coords(coords)
                 structure_info = get_structure_info(structure)
             else:
                 coords = None
@@ -93,6 +94,8 @@ def fetch_pdb_ids(uniprot_id):
     for db_reference in tree.findall(".//{http://uniprot.org/uniprot}dbReference[@type='PDB']"):
         pdb_id = db_reference.get('id')
         pdb_ids.append(pdb_id)
+    if pdb_ids:
+        print(pdb_ids)
     return pdb_ids
 
 
@@ -103,34 +106,32 @@ def download_pdb(pdb_id, pdb_dir='pdb_files'):
     return os.path.join(pdb_dir, f'pdb{pdb_id.lower()}.ent')
 
 
-# 3. Function to extract sequence from PDB structure
-def get_sequence(structure):
-    sequence = ""
+def extract_amino_acid_coords(structure):
+    ca_coords = []
     for model in structure:
         for chain in model:
+            if chain.id != "A":
+                continue
             for residue in chain:
-                if residue.id[0] == " ":  # Exclude hetero atoms
-                    sequence += seq1(residue.resname)
-    return sequence
+                # Filter out non-amino acid residues
+                if residue.id[0] == ' ' and 'CA' in residue:
+                    ca_atom = residue['CA']
+                    ca_coords.append(ca_atom.get_coord())
+    return np.array(ca_coords)
 
 
-# 4. Function to generate contact map
-def get_coords_and_contact_map(structure, threshold=8.0):
-    atoms = list(structure.get_atoms())
-    num_atoms = len(atoms)
+def get_contact_map_from_coords(ca_coords, threshold=8.0):
+    num_residues = len(ca_coords)
+    contact_map = np.zeros((num_residues, num_residues))
 
-    coords = []
-    contact_map = np.zeros((num_atoms, num_atoms))
-
-    for i in range(num_atoms):
-        coords.append(atoms[i].coord)
-        for j in range(i + 1, num_atoms):
-            distance = atoms[i] - atoms[j]
+    for i in range(num_residues):
+        for j in range(i + 1, num_residues):
+            distance = np.linalg.norm(ca_coords[i] - ca_coords[j])
             if distance < threshold:
                 contact_map[i, j] = 1
                 contact_map[j, i] = 1
-    return coords, contact_map
 
+    return contact_map
 
 # 5. Function to extract structure info
 def get_structure_info(structure):

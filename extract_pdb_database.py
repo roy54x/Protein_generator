@@ -11,6 +11,7 @@ parser = PDB.PDBParser()
 
 amino_acids = 'ACDEFGHIKLMNPQRSTVWY'
 
+
 def get_pdb_ids_from_uniprot_xml(xml_file):
     pdb_ids = []
     context = etree.iterparse(xml_file, events=('end',), tag='{http://uniprot.org/uniprot}entry')
@@ -40,18 +41,20 @@ def get_pdb_data(pdb_ids, output_path):
     data = []
     for pdb_id in pdb_ids:
         pdb_file = download_pdb(pdb_id, os.path.join(output_path, 'pdb_files'))
-        structure = parser.get_structure(pdb_id, pdb_file)  # Use the first PDB file
-        sequence, coords = extract_amino_acid_coords(structure)
-        contact_map = get_contact_map_from_coords(coords)
+        structure = parser.get_structure(pdb_id, pdb_file)
         structure_info = get_structure_info(structure)
+        chain_ids, chain_sequences, chain_coords = extract_amino_acid_chains(structure)
 
-        data.append({
-            'pdb_id': pdb_id,
-            'sequence': sequence,
-            "coords": coords,
-            "contact_map": contact_map,
-            "structure_info": structure_info
-        })
+        for chain_id, sequence, coords in zip(chain_ids, chain_sequences, chain_coords):
+            contact_map = get_contact_map_from_coords(coords)
+            data.append({
+                'pdb_id': pdb_id,
+                'chain_id': chain_id,
+                'sequence': sequence,
+                "coords": coords,
+                "contact_map": contact_map,
+                "structure_info": structure_info
+            })
     df = pd.DataFrame(data)
     df.to_csv(os.path.join(output_path, "protein_df.csv"), index=False)
     return df
@@ -64,20 +67,25 @@ def download_pdb(pdb_id, pdb_dir='pdb_files'):
     return os.path.join(pdb_dir, f'pdb{pdb_id.lower()}.ent')
 
 
-def extract_amino_acid_coords(structure):
-    sequence = []
-    ca_coords = []
+def extract_amino_acid_chains(structure):
+    chain_ids = []
+    chain_sequences = []
+    chain_coords = []
     for model in structure:
         for chain in model:
+            sequence = []
+            coords = []
             for residue in chain:
-                # Filter out non-amino acid residues
                 letter = seq1(residue.resname)
+                # Filter out non-amino acid residues
                 if residue.id[0] == ' ' and 'CA' in residue and letter in amino_acids:
                     sequence.append(letter)
                     ca_atom = residue['CA']
-                    ca_coords.append(ca_atom.get_coord())
-            break
-    return ''.join(sequence), np.array(ca_coords)
+                    coords.append(ca_atom.get_coord())
+            chain_ids.append(chain.id)
+            chain_sequences.append(''.join(sequence))
+            chain_coords.append(np.array(coords))
+    return chain_ids, chain_sequences, chain_coords
 
 
 def get_contact_map_from_coords(ca_coords, threshold=8.0):

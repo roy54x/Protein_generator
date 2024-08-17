@@ -46,8 +46,8 @@ class SequenceToContactMapStrategy(BaseStrategy):
         mask = [1] * len(tokens) + [0] * (MAX_SIZE - len(tokens))
         if len(tokens) < MAX_SIZE:
             tokens += [0] * (MAX_SIZE - len(tokens))
-        x_tensor = torch.tensor(tokens[:MAX_SIZE], dtype=torch.int)  # Shape: (max_size)
-        mask_tensor = torch.tensor(mask[:MAX_SIZE], dtype=torch.int)  # Shape: (max_size)
+        x_tensor = torch.tensor(tokens, dtype=torch.int)  # Shape: (max_size)
+        mask_tensor = torch.tensor(mask, dtype=torch.int)  # Shape: (max_size)
 
         # Get ground truth
         contact_map = np.array(data['contact_map'])
@@ -55,9 +55,8 @@ class SequenceToContactMapStrategy(BaseStrategy):
         if contact_map.shape[0] < MAX_SIZE or contact_map.shape[1] < MAX_SIZE:
             padded_contact_map = np.zeros((MAX_SIZE, MAX_SIZE))
             padded_contact_map[:contact_map.shape[0], :contact_map.shape[1]] = contact_map
-            ground_truth = torch.tensor(padded_contact_map, dtype=torch.float)
-        else:
-            ground_truth = torch.tensor(contact_map[:MAX_SIZE, :MAX_SIZE], dtype=torch.float)
+            contact_map = padded_contact_map
+        ground_truth = torch.tensor(contact_map, dtype=torch.float)
 
         return (x_tensor, mask_tensor), ground_truth
 

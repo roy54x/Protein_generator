@@ -10,7 +10,7 @@ class BaseStrategy(nn.Module):
 
     @staticmethod
     def get_augmentation_indices(seq_len):
-        length = random.randint(MIN_SIZE, seq_len)
+        length = random.randint(MIN_SIZE, min(seq_len, MAX_SIZE))
         start = random.randint(0, max(0, seq_len - length))
         return start, start+length
 

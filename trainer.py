@@ -1,6 +1,11 @@
+import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
+from torch import optim
 from torch.utils.data import DataLoader, Dataset
+
+from constants import MIN_SIZE
+from strategies.sequence_to_contact_map import SequenceToContactMapStrategy
 
 
 class CustomDataset(Dataset):
@@ -20,21 +25,23 @@ class CustomDataset(Dataset):
 
 class Trainer:
     def __init__(self, dataframe, strategy, batch_size=32, test_size=0.2):
+        dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) >= MIN_SIZE)]
         train_df, test_df = train_test_split(dataframe, test_size=test_size, random_state=42, shuffle=False)
         self.train_loader = DataLoader(CustomDataset(train_df, strategy), batch_size=batch_size, shuffle=True)
         self.test_loader = DataLoader(CustomDataset(test_df, strategy), batch_size=batch_size, shuffle=False)
         self.strategy = strategy
+        self.optimizer = optim.Adam(strategy.parameters(), lr=0.001)
 
-    def train(self, optimizer, epochs=10):
+    def train(self, epochs=10):
         self.strategy.train()
         for epoch in range(epochs):
             total_train_loss = 0
             for inputs, ground_truth in self.train_loader:
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 outputs = self.strategy(inputs)
                 loss = self.strategy.compute_loss(outputs, ground_truth)
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
                 total_train_loss += loss.item()
 
             print(f'Epoch {epoch + 1}, Training Loss: {total_train_loss}')
@@ -49,3 +56,10 @@ class Trainer:
                     total_test_loss += loss.item()
             print(f'Epoch {epoch + 1}, Test Loss: {total_test_loss}')
             self.strategy.train()  # Switch back to training mode
+
+
+if __name__ == '__main__':
+    dataframe = pd.read_json("D:\python project\data\PDB\protein_df.json")
+    strategy = SequenceToContactMapStrategy()
+    trainer = Trainer(dataframe, strategy, batch_size=16, test_size=0.2)
+    trainer.train(epochs=10)

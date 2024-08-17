@@ -56,7 +56,7 @@ def get_pdb_data(pdb_ids, output_path):
                 "structure_info": structure_info
             })
     df = pd.DataFrame(data)
-    df.to_csv(os.path.join(output_path, "protein_df.csv"), index=False)
+    df.to_json(os.path.join(output_path, "protein_df.json"), index=False)
     return df
 
 

@@ -18,8 +18,7 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.dataframe.iloc[idx]
-        inputs = self.strategy.load_inputs(row)
-        ground_truth = self.strategy.get_ground_truth(row)
+        inputs, ground_truth = self.strategy.load_inputs_and_ground_truth(row)
         return inputs, ground_truth
 
 

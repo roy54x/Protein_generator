@@ -36,28 +36,30 @@ class SequenceToContactMapStrategy(BaseStrategy):
             nn.Conv2d(in_channels=8, out_channels=1, kernel_size=5, padding="same")
         )
 
-    def load_inputs(self, data):
+    def load_inputs_and_ground_truth(self, data):
         sequence = data['sequence']
-        tokens = [self.AMINO_ACID_TO_INDEX.get(aa, 0) for aa in sequence]  # 0 for unknown amino acids
+        start, end = self.get_augmentation_indices(len(sequence))
 
-        # Create mask where 1 indicates real tokens and 0 indicates padding
+        # Get inputs
+        sequence = sequence[start: end]
+        tokens = [self.AMINO_ACID_TO_INDEX.get(aa, 0) for aa in sequence]  # 0 for unknown amino acids
         mask = [1] * len(tokens) + [0] * (MAX_SIZE - len(tokens))
         if len(tokens) < MAX_SIZE:
             tokens += [0] * (MAX_SIZE - len(tokens))
-
-        tokens_tensor = torch.tensor(tokens[:MAX_SIZE], dtype=torch.int)  # Shape: (max_size)
+        x_tensor = torch.tensor(tokens[:MAX_SIZE], dtype=torch.int)  # Shape: (max_size)
         mask_tensor = torch.tensor(mask[:MAX_SIZE], dtype=torch.int)  # Shape: (max_size)
 
-        return tokens_tensor, mask_tensor
-
-    def get_ground_truth(self, data):
-        # Assume contact_map is stored as a numpy array or similar in the dataframe
+        # Get ground truth
         contact_map = np.array(data['contact_map'])
+        contact_map = contact_map[start: end, start: end]
         if contact_map.shape[0] < MAX_SIZE or contact_map.shape[1] < MAX_SIZE:
             padded_contact_map = np.zeros((MAX_SIZE, MAX_SIZE))
             padded_contact_map[:contact_map.shape[0], :contact_map.shape[1]] = contact_map
-            return torch.tensor(padded_contact_map, dtype=torch.float)
-        return torch.tensor(contact_map[:MAX_SIZE, :MAX_SIZE], dtype=torch.float)
+            ground_truth = torch.tensor(padded_contact_map, dtype=torch.float)
+        else:
+            ground_truth = torch.tensor(contact_map[:MAX_SIZE, :MAX_SIZE], dtype=torch.float)
+
+        return (x_tensor, mask_tensor), ground_truth
 
     def forward(self, input):
         x, mask = input

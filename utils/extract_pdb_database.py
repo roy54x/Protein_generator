@@ -6,7 +6,7 @@ import numpy as np
 from Bio.SeqUtils import seq1
 from lxml import etree
 
-from constants import AMINO_ACIDS
+from utils.constants import AMINO_ACIDS
 
 pdb_list = PDB.PDBList()
 parser = PDB.PDBParser()

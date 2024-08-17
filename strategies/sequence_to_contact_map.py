@@ -1,12 +1,10 @@
-import ast
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import transformers
 
-from constants import AMINO_ACIDS, MAX_SIZE
+from utils.constants import AMINO_ACIDS, MAX_SIZE
 from strategies.base import BaseStrategy
 
 

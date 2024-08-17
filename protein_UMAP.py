@@ -3,7 +3,7 @@ import pandas as pd
 import umap.umap_ as umap
 from matplotlib import pyplot as plt
 
-from extract_pdb_database import AMINO_ACIDS
+from utils.extract_pdb_database import AMINO_ACIDS
 
 
 def one_hot_encode_sequence(sequences):

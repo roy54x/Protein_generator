@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from torch import optim
 from torch.utils.data import DataLoader, Dataset
 
-from constants import MIN_SIZE
+from utils.constants import MIN_SIZE
 from strategies.sequence_to_contact_map import SequenceToContactMapStrategy
 
 

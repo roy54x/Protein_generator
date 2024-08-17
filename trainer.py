@@ -36,6 +36,7 @@ class Trainer:
         self.strategy.train()
         for epoch in range(epochs):
             total_train_loss = 0
+            total_train_samples = 0
             for inputs, ground_truth in self.train_loader:
                 self.optimizer.zero_grad()
                 outputs = self.strategy(inputs)
@@ -43,18 +44,21 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
                 total_train_loss += loss.item()
+                total_train_samples += len(inputs)
 
-            print(f'Epoch {epoch + 1}, Training Loss: {total_train_loss}')
+            print(f'Epoch {epoch + 1}, Training Loss: {total_train_loss/total_train_samples}')
 
             # Evaluate on test data
             self.strategy.eval()
             total_test_loss = 0
+            total_test_samples = 0
             with torch.no_grad():
                 for inputs, ground_truth in self.test_loader:
                     outputs = self.strategy(inputs)
                     loss = self.strategy.compute_loss(outputs, ground_truth)
                     total_test_loss += loss.item()
-            print(f'Epoch {epoch + 1}, Test Loss: {total_test_loss}')
+                    total_test_samples += len(inputs)
+            print(f'Epoch {epoch + 1}, Test Loss: {total_test_loss/total_test_samples}')
             self.strategy.train()  # Switch back to training mode
 
 

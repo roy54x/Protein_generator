@@ -39,9 +39,16 @@ class SequenceToContactMapStrategy(BaseStrategy):
     def load_inputs(self, data):
         sequence = data['sequence']
         tokens = [self.AMINO_ACID_TO_INDEX.get(aa, 0) for aa in sequence]  # 0 for unknown amino acids
+
+        # Create mask where 1 indicates real tokens and 0 indicates padding
+        mask = [1] * len(tokens) + [0] * (MAX_SIZE - len(tokens))
         if len(tokens) < MAX_SIZE:
             tokens += [0] * (MAX_SIZE - len(tokens))
-        return torch.tensor(tokens[:MAX_SIZE], dtype=torch.int)  # Shape: (max_size)
+
+        tokens_tensor = torch.tensor(tokens[:MAX_SIZE], dtype=torch.int)  # Shape: (max_size)
+        mask_tensor = torch.tensor(mask[:MAX_SIZE], dtype=torch.int)  # Shape: (max_size)
+
+        return tokens_tensor, mask_tensor
 
     def get_ground_truth(self, data):
         # Assume contact_map is stored as a numpy array or similar in the dataframe
@@ -52,9 +59,11 @@ class SequenceToContactMapStrategy(BaseStrategy):
             return torch.tensor(padded_contact_map, dtype=torch.float)
         return torch.tensor(contact_map[:MAX_SIZE, :MAX_SIZE], dtype=torch.float)
 
-    def forward(self, x):
+    def forward(self, input):
+        x, mask = input
+
         # x is of shape (batch_size, max_size, 1)
-        transformer_output = self.transformer(x).last_hidden_state  # Shape: (batch_size, max_size, max_size)
+        transformer_output = self.transformer(x, attention_mask=mask).last_hidden_state  # Shape: (batch_size, max_size, max_size)
 
         # Outer product to get pairwise interactions
         pairwise_interactions = torch.einsum('bik,bjk->bij', transformer_output, transformer_output)

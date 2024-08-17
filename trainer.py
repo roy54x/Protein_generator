@@ -65,4 +65,4 @@ if __name__ == '__main__':
     dataframe = pd.read_json("D:\python project\data\PDB\protein_df.json")
     strategy = SequenceToContactMapStrategy()
     trainer = Trainer(dataframe, strategy, batch_size=16, test_size=0.2)
-    trainer.train(epochs=10)
+    trainer.train(epochs=100)

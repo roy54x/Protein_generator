@@ -1,3 +1,4 @@
+import json
 import os
 import pandas as pd
 import requests
@@ -12,12 +13,37 @@ pdb_list = PDB.PDBList()
 parser = PDB.PDBParser()
 
 
-def get_pdb_ids_from_uniprot_xml(xml_file):
-    pdb_ids = []
+def get_pdb_ids_from_uniprot_xml(xml_file, json_path='D:\python project\data\PDB\pdn_ids.json'):
+    if os.path.exists(json_path):
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+            accessions, pdb_ids = data["accessions"], data['pdb_ids']
+    else:
+        accessions, pdb_ids = [], []
+
     context = etree.iterparse(xml_file, events=('end',), tag='{http://uniprot.org/uniprot}entry')
+
+    counter = 0
     for event, elem in context:
         accession = elem.findtext('{http://uniprot.org/uniprot}accession')
+        print(accession)
+        if accession in accessions:
+            continue
+
+        accessions.append(accession)
         pdb_ids.extend(fetch_pdb_ids(accession))
+
+        # Write to JSON every 100 iterations
+        if (counter + 1) % 100 == 0:
+            with open(json_path, 'a') as f:
+                json.dump({'accessions': accessions, 'pdb_ids': list(set(pdb_ids))}, f)
+                f.write('\n')  # To separate each JSON object in the file
+        counter += 1
+
+    # Write any remaining data to JSON
+    with open(json_path, 'a') as f:
+        json.dump({'accessions': accessions, 'pdb_ids': list(set(pdb_ids))}, f)
+
     return list(set(pdb_ids))  # Remove duplicates
 
 
@@ -56,8 +82,8 @@ def get_pdb_data(pdb_ids, output_path):
                 "structure_info": structure_info
             })
     df = pd.DataFrame(data)
-    df.to_json(os.path.join(output_path, "protein_df.json"), index=False)
-    df.to_csv(os.path.join(output_path, "protein_df.csv"), index=False)
+    df.to_json(os.path.join(output_path, "protein_df_10000.json"), index=False)
+    df.to_csv(os.path.join(output_path, "protein_df_10000.csv"), index=False)
     return df
 
 

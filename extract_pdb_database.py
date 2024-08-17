@@ -6,10 +6,10 @@ import numpy as np
 from Bio.SeqUtils import seq1
 from lxml import etree
 
+from constants import AMINO_ACIDS
+
 pdb_list = PDB.PDBList()
 parser = PDB.PDBParser()
-
-amino_acids = 'ACDEFGHIKLMNPQRSTVWY'
 
 
 def get_pdb_ids_from_uniprot_xml(xml_file):
@@ -78,7 +78,7 @@ def extract_amino_acid_chains(structure):
             for residue in chain:
                 letter = seq1(residue.resname)
                 # Filter out non-amino acid residues
-                if residue.id[0] == ' ' and 'CA' in residue and letter in amino_acids:
+                if residue.id[0] == ' ' and 'CA' in residue and letter in AMINO_ACIDS:
                     sequence.append(letter)
                     ca_atom = residue['CA']
                     coords.append(ca_atom.get_coord())

@@ -3,12 +3,12 @@ import pandas as pd
 import umap.umap_ as umap
 from matplotlib import pyplot as plt
 
-from extract_pdb_database import amino_acids
+from extract_pdb_database import AMINO_ACIDS
 
 
 def one_hot_encode_sequence(sequences):
-    aa_to_index = {aa: i for i, aa in enumerate(amino_acids)}
-    num_amino_acids = len(amino_acids)
+    aa_to_index = {aa: i for i, aa in enumerate(AMINO_ACIDS)}
+    num_amino_acids = len(AMINO_ACIDS)
     max_len = max([len(s) for s in sequences])
 
     encoded_sequences = []

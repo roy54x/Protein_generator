@@ -37,6 +37,7 @@ class Trainer:
         train_df, test_df = train_test_split(dataframe, test_size=test_size, random_state=42, shuffle=False)
         self.train_loader = DataLoader(CustomDataset(train_df, strategy, "train"), batch_size=batch_size, shuffle=True)
         self.test_loader = DataLoader(CustomDataset(test_df, strategy, "test"), batch_size=batch_size, shuffle=False)
+        self.num_batches = len(self.train_loader)
 
         self.device = device
         self.strategy = strategy.to(self.device)
@@ -69,12 +70,10 @@ class Trainer:
                     end_time = time.time()
                     batch_time = end_time - start_time
                     print(
-                        f'Epoch {epoch + 1}, Batch {batch_count}, Training Loss: {avg_train_loss:.4f}, Time for 100 Batches: {batch_time:.4f} seconds')
+                        f'Epoch {epoch + 1}, Batch {batch_count} out of {self.num_batches}, Training Loss: {avg_train_loss:.4f}, Time for 100 Batches: {batch_time:.4f} seconds')
                     start_time = end_time
                     total_train_loss = 0
                     total_train_samples = 0
-
-            print(f'Epoch {epoch + 1}, Training Loss: {total_train_loss / total_train_samples}')
 
             # Evaluate on test data
             self.strategy.eval()
@@ -82,8 +81,8 @@ class Trainer:
             total_test_samples = 0
             with torch.no_grad():
                 for inputs, ground_truth in self.test_loader:
-                    outputs = self.strategy(inputs)
-                    loss = self.strategy.compute_loss(outputs, ground_truth)
+                    outputs = self.strategy((x.to(self.device) for x in inputs))
+                    loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
                     total_test_loss += loss.item()
                     total_test_samples += len(inputs)
 

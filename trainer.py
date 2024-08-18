@@ -13,9 +13,10 @@ from strategies.sequence_to_contact_map import SequenceToContactMap
 
 
 class CustomDataset(Dataset):
-    def __init__(self, dataframe, strategy):
+    def __init__(self, dataframe, strategy, dataset_name):
         self.dataframe = dataframe
         self.strategy = strategy
+        print(f"number of samples in the {dataset_name} set are: {len(self.dataframe)}")
 
     def __len__(self):
         return len(self.dataframe)
@@ -30,17 +31,21 @@ class Trainer:
     def __init__(self, dataframe, strategy, batch_size=32, test_size=0.2):
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) >= MIN_SIZE)]
         train_df, test_df = train_test_split(dataframe, test_size=test_size, random_state=42, shuffle=False)
-        self.train_loader = DataLoader(CustomDataset(train_df, strategy), batch_size=batch_size, shuffle=True)
-        self.test_loader = DataLoader(CustomDataset(test_df, strategy), batch_size=batch_size, shuffle=False)
+        self.train_loader = DataLoader(CustomDataset(train_df, strategy, "train"), batch_size=batch_size, shuffle=True)
+        self.test_loader = DataLoader(CustomDataset(test_df, strategy, "test"), batch_size=batch_size, shuffle=False)
         self.strategy = strategy
         self.optimizer = optim.Adam(strategy.parameters(), lr=0.001)
         self.best_test_loss = float('inf')
+        print(f'Number of trainable parameters: '
+              f'{sum(p.numel() for p in self.strategy.parameters() if p.requires_grad)}')
 
     def train(self, epochs=10):
         self.strategy.train()
         for epoch in range(epochs):
             total_train_loss = 0
             total_train_samples = 0
+            batch_count = 0
+
             for inputs, ground_truth in self.train_loader:
                 self.optimizer.zero_grad()
                 outputs = self.strategy(inputs)
@@ -49,6 +54,12 @@ class Trainer:
                 self.optimizer.step()
                 total_train_loss += loss.item()
                 total_train_samples += len(inputs)
+                batch_count += 1
+
+                # Print training loss every 100 batches
+                if batch_count % 100 == 0:
+                    avg_train_loss = total_train_loss / total_train_samples
+                    print(f'Epoch {epoch + 1}, Batch {batch_count}, Training Loss: {avg_train_loss}')
 
             print(f'Epoch {epoch + 1}, Training Loss: {total_train_loss / total_train_samples}')
 

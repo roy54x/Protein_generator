@@ -33,9 +33,12 @@ class SequenceDiffusionModel(Base):
 
     def __init__(self):
         super(SequenceDiffusionModel, self).__init__()
+        self.vocab_size = len(AMINO_ACIDS) + 1
+        self.min_split_percent, self.max_split_percent = 0.5, 0.9
+        self.max_input_size, self.max_output_size = int(MAX_SIZE * self.max_split_percent), int(MAX_SIZE * self.min_split_percent)
 
         config = transformers.RobertaConfig(
-            vocab_size=len(AMINO_ACIDS) + 1,
+            vocab_size=self.vocab_size,
             max_position_embeddings=252,
             hidden_size=36,
             num_attention_heads=6,
@@ -44,9 +47,8 @@ class SequenceDiffusionModel(Base):
         )
         self.transformer = transformers.RobertaModel(config=config)
         self.diffusion = DiffusionModule(hidden_size=36, timesteps=100, num_layers=3)
-        self.output_layer = nn.Linear(36, len(AMINO_ACIDS) + 1)
-        self.pooling = nn.AdaptiveAvgPool1d(1)
-        self.min_split_percent, self.max_split_percent = 0.5, 0.9
+        self.output_layer = nn.Linear(36, self.max_output_size
+                                      * self.vocab_size)
 
     def load_inputs_and_ground_truth(self, data):
         sequence = data['sequence']
@@ -57,11 +59,11 @@ class SequenceDiffusionModel(Base):
         ground_truth_seq = sequence[split_idx:end_idx]
 
         # Get input
-        x_tensor, mask_tensor = padd_sequence(input_seq, int(MAX_SIZE*self.max_split_percent))
+        x_tensor, mask_tensor = padd_sequence(input_seq, self.max_input_size)
 
         # Get ground truth and one-hot encode it
         ground_truth_indices = [AMINO_ACID_TO_INDEX[aa] for aa in ground_truth_seq]
-        ground_truth = torch.zeros((int(MAX_SIZE*self.min_split_percent), len(AMINO_ACIDS) + 1))  # One-hot tensor
+        ground_truth = torch.zeros((self.max_output_size, self.vocab_size))  # One-hot tensor
         for i, idx in enumerate(ground_truth_indices):
             ground_truth[i, idx] = 1
 
@@ -69,13 +71,14 @@ class SequenceDiffusionModel(Base):
 
     def forward(self, input):
         x, mask = input
+        batch_size = x.shape[0]
 
         # x is of shape (batch_size, max_size, 1)
-        transformer_output = self.transformer(x,
-                                              attention_mask=mask).last_hidden_state # Shape: (batch_size, max_size, hidden_size)
-        pooled_output = self.pooling(transformer_output.transpose(1, 2)).squeeze(-1)  # Shape: (batch_size, hidden_size)
-        diffusion_output = self.diffusion(pooled_output)  # Shape: (batch_size, hidden_size)
-        output = self.output_layer(diffusion_output)  # Shape: (batch_size, vocab_size)
+        transformer_pooled_output = self.transformer(x,
+                                                     attention_mask=mask).pooler_output  # Shape: (batch_size, hidden_size)
+        diffusion_output = self.diffusion(transformer_pooled_output)  # Shape: (batch_size, hidden_size)
+        output = self.output_layer(diffusion_output)  # Shape: (batch_size, max_size * vocab_size)
+        output = output.view(batch_size, self.max_output_size, self.vocab_size)
         output = F.softmax(output, dim=-1)
         return output
 

@@ -63,10 +63,7 @@ class SequenceDiffusionModel(Base):
         x_tensor, mask_tensor = padd_sequence(input_seq, self.max_input_size)
 
         # Get ground truth and one-hot encode it
-        ground_truth_indices = [AMINO_ACID_TO_INDEX[aa] for aa in ground_truth_seq]
-        ground_truth = torch.zeros((self.max_output_size, self.vocab_size))  # One-hot tensor
-        for i, idx in enumerate(ground_truth_indices):
-            ground_truth[i, idx] = 1
+        ground_truth = padd_sequence(ground_truth_seq, self.max_output_size)[0].to(torch.long)
 
         return (x_tensor, mask_tensor), ground_truth
 
@@ -84,5 +81,4 @@ class SequenceDiffusionModel(Base):
         return output
 
     def compute_loss(self, outputs, ground_truth):
-        # Assuming ground_truth is one-hot encoded and of shape (batch_size, max_size, vocab_size)
-        return F.cross_entropy(outputs.view(-1, outputs.size(-1)), ground_truth.argmax(dim=-1).view(-1))
+        return F.cross_entropy(outputs.view(-1, outputs.size(-1)), ground_truth.view(-1))

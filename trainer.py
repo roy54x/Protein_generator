@@ -14,9 +14,10 @@ from strategies.sequence_to_contact_map import SequenceToContactMap
 
 
 class CustomDataset(Dataset):
-    def __init__(self, dataframe, strategy, dataset_name):
+    def __init__(self, dataframe, strategy, dataset_name, device="cuda:0"):
         self.dataframe = dataframe
         self.strategy = strategy
+        self.device = device
         print(f"number of samples in the {dataset_name} set are: {len(self.dataframe)}")
 
     def __len__(self):
@@ -25,17 +26,19 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         row = self.dataframe.iloc[idx]
         inputs, ground_truth = self.strategy.load_inputs_and_ground_truth(row)
-        return inputs, ground_truth
+        return inputs.to(self.device), ground_truth.to(self.device)
 
 
 class Trainer:
-    def __init__(self, dataframe, strategy, batch_size=32, test_size=0.2):
+    def __init__(self, dataframe, strategy, batch_size=32, test_size=0.2, device="cuda:0"):
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) >= MIN_SIZE)]
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: all(char in AMINO_ACIDS for char in seq))]
+
         train_df, test_df = train_test_split(dataframe, test_size=test_size, random_state=42, shuffle=False)
         self.train_loader = DataLoader(CustomDataset(train_df, strategy, "train"), batch_size=batch_size, shuffle=True)
         self.test_loader = DataLoader(CustomDataset(test_df, strategy, "test"), batch_size=batch_size, shuffle=False)
-        self.strategy = strategy
+
+        self.strategy = strategy.to(device)
         self.optimizer = optim.Adam(strategy.parameters(), lr=0.001)
         self.best_test_loss = float('inf')
         print(f'Number of trainable parameters: '

@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime
 
 import pandas as pd
@@ -45,6 +46,7 @@ class Trainer:
             total_train_loss = 0
             total_train_samples = 0
             batch_count = 0
+            start_time = time.time()
 
             for inputs, ground_truth in self.train_loader:
                 self.optimizer.zero_grad()
@@ -59,7 +61,13 @@ class Trainer:
                 # Print training loss every 100 batches
                 if batch_count % 100 == 0:
                     avg_train_loss = total_train_loss / total_train_samples
-                    print(f'Epoch {epoch + 1}, Batch {batch_count}, Training Loss: {avg_train_loss}')
+                    end_time = time.time()
+                    batch_time = end_time - start_time
+                    print(
+                        f'Epoch {epoch + 1}, Batch {batch_count}, Training Loss: {avg_train_loss:.4f}, Time for 100 Batches: {batch_time:.4f} seconds')
+                    start_time = end_time
+                    total_train_loss = 0
+                    total_train_samples = 0
 
             print(f'Epoch {epoch + 1}, Training Loss: {total_train_loss / total_train_samples}')
 

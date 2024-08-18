@@ -36,18 +36,18 @@ class SequenceDiffusionModel(Base):
         self.vocab_size = len(AMINO_ACIDS) + 1
         self.min_split_percent, self.max_split_percent = 0.5, 0.9
         self.max_input_size, self.max_output_size = int(MAX_SIZE * self.max_split_percent), int(MAX_SIZE * self.min_split_percent)
-        self.hidden_size = 18
+        self.hidden_size = 8
 
         config = transformers.RobertaConfig(
             vocab_size=self.vocab_size,
             max_position_embeddings=self.max_input_size+2,
             hidden_size=self.hidden_size,
-            num_attention_heads=6,
-            num_hidden_layers=6,
+            num_attention_heads=4,
+            num_hidden_layers=4,
             type_vocab_size=1
         )
         self.transformer = transformers.RobertaModel(config=config)
-        self.diffusion = DiffusionModule(hidden_size=self.hidden_size, timesteps=100, num_layers=3)
+        self.diffusion = DiffusionModule(hidden_size=self.hidden_size, timesteps=10, num_layers=3)
         self.output_layer = nn.Linear(self.hidden_size, self.max_output_size
                                       * self.vocab_size)
 

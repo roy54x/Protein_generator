@@ -4,9 +4,9 @@ import torch.nn as nn
 from utils.constants import MIN_SIZE, MAX_SIZE
 
 
-class BaseStrategy(nn.Module):
+class Base(nn.Module):
     def __init__(self):
-        super(BaseStrategy, self).__init__()
+        super(Base, self).__init__()
 
     @staticmethod
     def get_augmentation_indices(seq_len):

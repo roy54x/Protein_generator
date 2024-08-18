@@ -1,11 +1,14 @@
+import os
+from datetime import datetime
+
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
 from torch import optim
 from torch.utils.data import DataLoader, Dataset
 
-from utils.constants import MIN_SIZE
-from strategies.sequence_to_contact_map import SequenceToContactMapStrategy
+from utils.constants import MIN_SIZE, MAIN_DIR
+from strategies.sequence_to_contact_map import SequenceToContactMap
 
 
 class CustomDataset(Dataset):
@@ -30,6 +33,7 @@ class Trainer:
         self.test_loader = DataLoader(CustomDataset(test_df, strategy), batch_size=batch_size, shuffle=False)
         self.strategy = strategy
         self.optimizer = optim.Adam(strategy.parameters(), lr=0.001)
+        self.best_test_loss = float('inf')
 
     def train(self, epochs=10):
         self.strategy.train()
@@ -45,7 +49,7 @@ class Trainer:
                 total_train_loss += loss.item()
                 total_train_samples += len(inputs)
 
-            print(f'Epoch {epoch + 1}, Training Loss: {total_train_loss/total_train_samples}')
+            print(f'Epoch {epoch + 1}, Training Loss: {total_train_loss / total_train_samples}')
 
             # Evaluate on test data
             self.strategy.eval()
@@ -57,12 +61,34 @@ class Trainer:
                     loss = self.strategy.compute_loss(outputs, ground_truth)
                     total_test_loss += loss.item()
                     total_test_samples += len(inputs)
-            print(f'Epoch {epoch + 1}, Test Loss: {total_test_loss/total_test_samples}')
+
+            average_test_loss = total_test_loss / total_test_samples
+            print(f'Epoch {epoch + 1}, Test Loss: {average_test_loss}')
+
+            # Save the model if the test loss is the best seen so far
+            if average_test_loss < self.best_test_loss:
+                self.best_test_loss = average_test_loss
+                self.save_model()
+
             self.strategy.train()  # Switch back to training mode
+
+    def save_model(self):
+        # Create the directory name from strategy and date
+        directory = os.path.join(MAIN_DIR, "models", self.strategy.__class__.__name__,
+                                 datetime.now().strftime("%Y%m%d"))
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        # Define the path for saving the model
+        model_path = os.path.join(directory, 'best_model.pth')
+
+        # Save the model
+        torch.save(self.strategy.state_dict(), model_path)
+        print(f'Model saved at {model_path}')
 
 
 if __name__ == '__main__':
-    dataframe = pd.read_json("D:\python project\data\PDB\protein_df.json")
-    strategy = SequenceToContactMapStrategy()
+    dataframe = pd.read_json(os.path.join(MAIN_DIR,"PDB\protein_df.json"))
+    strategy = SequenceToContactMap()
     trainer = Trainer(dataframe, strategy, batch_size=16, test_size=0.2)
     trainer.train(epochs=100)

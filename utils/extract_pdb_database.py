@@ -7,44 +7,42 @@ import numpy as np
 from Bio.SeqUtils import seq1
 from lxml import etree
 
-from utils.constants import AMINO_ACIDS
+from utils.constants import AMINO_ACIDS, MAIN_DIR
 
 pdb_list = PDB.PDBList()
 parser = PDB.PDBParser()
 
 
-def get_pdb_ids_from_uniprot_xml(xml_file, json_path='D:\python project\data\PDB\pdn_ids.json'):
+def get_pdb_ids_from_uniprot_xml(xml_file, json_path='pdn_ids.json'):
     if os.path.exists(json_path):
         with open(json_path, 'r') as f:
             data = json.load(f)
-            accessions, pdb_ids = data["accessions"], data['pdb_ids']
     else:
-        accessions, pdb_ids = [], []
+        data = {}
 
+    accessions = data.keys()
     context = etree.iterparse(xml_file, events=('end',), tag='{http://uniprot.org/uniprot}entry')
 
     counter = 0
     for event, elem in context:
         accession = elem.findtext('{http://uniprot.org/uniprot}accession')
-        print(accession)
-        if accession in accessions:
+        print("processing protein: " + accession)
+        if accession in data.keys():
             continue
 
-        accessions.append(accession)
-        pdb_ids.extend(fetch_pdb_ids(accession))
+        data[accession] = fetch_pdb_ids(accession)
 
         # Write to JSON every 100 iterations
         if (counter + 1) % 100 == 0:
-            with open(json_path, 'a') as f:
-                json.dump({'accessions': accessions, 'pdb_ids': list(set(pdb_ids))}, f)
-                f.write('\n')  # To separate each JSON object in the file
+            with open(json_path, 'w') as f:
+                json.dump(data, f)
         counter += 1
 
     # Write any remaining data to JSON
-    with open(json_path, 'a') as f:
-        json.dump({'accessions': accessions, 'pdb_ids': list(set(pdb_ids))}, f)
+    with open(json_path, 'w') as f:
+        json.dump(data, f)
 
-    return list(set(pdb_ids))  # Remove duplicates
+    return list(set(data.values()))  # Remove duplicates
 
 
 def fetch_pdb_ids(uniprot_id):
@@ -82,8 +80,8 @@ def get_pdb_data(pdb_ids, output_path):
                 "structure_info": structure_info
             })
     df = pd.DataFrame(data)
-    df.to_json(os.path.join(output_path, "protein_df_10000.json"), index=False)
-    df.to_csv(os.path.join(output_path, "protein_df_10000.csv"), index=False)
+    df.to_json(os.path.join(output_path, "pdb_df.json"), index=False)
+    df.to_csv(os.path.join(output_path, "pdb_df.csv"), index=False)
     return df
 
 
@@ -138,6 +136,7 @@ def get_structure_info(structure):
     }
 
 
-pdb_ids = get_pdb_ids_from_uniprot_xml(r"D:\python project\data\uniprot_sprot.xml\uniprot_sprot.xml")
-df = get_pdb_data(pdb_ids, output_path=r"D:\python project\data\PDB")
+pdb_ids = get_pdb_ids_from_uniprot_xml(os.path.join(MAIN_DIR, r"UniProt\uniprot_sprot.xml\uniprot_sprot.xml"),
+                                       os.path.join(MAIN_DIR, "PDB", "UniProt2PBD.json"))
+df = get_pdb_data(pdb_ids, output_path=os.path.join(MAIN_DIR, "PDB"))
 print(df.head())

@@ -43,6 +43,6 @@ def parse_uniprot_xml(xml_file):
 
 
 if __name__ == '__main__':
-    xml_file_path = r'C:\Users\RoyIlani\Downloads\uniprot_sprot.xml'
+    xml_file_path = r'D:\python project\data\uniprot_sprot.xml\uniprot_sprot.xml'
     protein_df = parse_uniprot_xml(xml_file_path)
-    protein_df.to_csv("protein_df.csv")
+    protein_df.to_csv("uniprot_df.csv")

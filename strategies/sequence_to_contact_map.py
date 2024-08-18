@@ -5,14 +5,14 @@ import numpy as np
 import transformers
 
 from utils.constants import AMINO_ACIDS, MAX_SIZE
-from strategies.base import BaseStrategy
+from strategies.base import Base
 
 
-class SequenceToContactMapStrategy(BaseStrategy):
+class SequenceToContactMap(Base):
     AMINO_ACID_TO_INDEX = {aa: i + 1 for i, aa in enumerate(AMINO_ACIDS)}  # 1-indexed for padding
 
     def __init__(self):
-        super(SequenceToContactMapStrategy, self).__init__()
+        super(SequenceToContactMap, self).__init__()
 
         # Transformer encoder layer
         config = transformers.RobertaConfig(

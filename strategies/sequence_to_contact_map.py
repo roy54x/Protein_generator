@@ -4,12 +4,12 @@ import torch.nn.functional as F
 import numpy as np
 import transformers
 
-from utils.constants import AMINO_ACIDS, MAX_SIZE
+from utils.constants import AMINO_ACIDS, MAX_SIZE, AMINO_ACID_TO_INDEX
 from strategies.base import Base
+from utils.padding_functions import padd_sequence, padd_contact_map
 
 
 class SequenceToContactMap(Base):
-    AMINO_ACID_TO_INDEX = {aa: i + 1 for i, aa in enumerate(AMINO_ACIDS)}  # 1-indexed for padding
 
     def __init__(self):
         super(SequenceToContactMap, self).__init__()
@@ -38,23 +38,14 @@ class SequenceToContactMap(Base):
         sequence = data['sequence']
         start, end = self.get_augmentation_indices(len(sequence))
 
-        # Get inputs
+        # Get input
         sequence = sequence[start: end]
-        tokens = [self.AMINO_ACID_TO_INDEX.get(aa, 0) for aa in sequence]  # 0 for unknown amino acids
-        mask = [1] * len(tokens) + [0] * (MAX_SIZE - len(tokens))
-        if len(tokens) < MAX_SIZE:
-            tokens += [0] * (MAX_SIZE - len(tokens))
-        x_tensor = torch.tensor(tokens, dtype=torch.int)  # Shape: (max_size)
-        mask_tensor = torch.tensor(mask, dtype=torch.int)  # Shape: (max_size)
+        x_tensor, mask_tensor = padd_sequence(sequence, MAX_SIZE)
 
         # Get ground truth
         contact_map = np.array(data['contact_map'])
         contact_map = contact_map[start: end, start: end]
-        if contact_map.shape[0] < MAX_SIZE or contact_map.shape[1] < MAX_SIZE:
-            padded_contact_map = np.zeros((MAX_SIZE, MAX_SIZE))
-            padded_contact_map[:contact_map.shape[0], :contact_map.shape[1]] = contact_map
-            contact_map = padded_contact_map
-        ground_truth = torch.tensor(contact_map, dtype=torch.float)
+        ground_truth = padd_contact_map(contact_map, MAX_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth
 

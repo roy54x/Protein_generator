@@ -76,19 +76,17 @@ class Trainer:
         # Create the directory name from strategy and date
         directory = os.path.join(MAIN_DIR, "models", self.strategy.__class__.__name__,
                                  datetime.now().strftime("%Y%m%d"))
+
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        # Define the path for saving the model
         model_path = os.path.join(directory, 'best_model.pth')
-
-        # Save the model
         torch.save(self.strategy.state_dict(), model_path)
         print(f'Model saved at {model_path}')
 
 
 if __name__ == '__main__':
-    dataframe = pd.read_json(os.path.join(MAIN_DIR,"PDB\protein_df.json"))
+    dataframe = pd.read_json(os.path.join(MAIN_DIR,"PDB\pdb_df_100.json"))
     strategy = SequenceToContactMap()
     trainer = Trainer(dataframe, strategy, batch_size=16, test_size=0.2)
     trainer.train(epochs=100)

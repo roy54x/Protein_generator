@@ -27,7 +27,7 @@ def get_pdb_ids_from_uniprot_xml(xml_file, json_path='pdn_ids.json'):
     for event, elem in context:
         accession = elem.findtext('{http://uniprot.org/uniprot}accession')
         print("processing protein: " + accession)
-        if accession in data.keys():
+        if accession in accessions:
             continue
 
         data[accession] = fetch_pdb_ids(accession)

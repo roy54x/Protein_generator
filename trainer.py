@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from torch import optim
 from torch.utils.data import DataLoader, Dataset
 
+from strategies.sequence_to_binding_sequence import SequenceDiffusionModel
 from utils.constants import MIN_SIZE, MAIN_DIR
 from strategies.sequence_to_contact_map import SequenceToContactMap
 
@@ -86,7 +87,9 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    dataframe = pd.read_json(os.path.join(MAIN_DIR,"PDB\pdb_df_100.json"))
-    strategy = SequenceToContactMap()
+    #dataframe = pd.read_json(os.path.join(MAIN_DIR,"PDB\pdb_df_100.json"))
+    #strategy = SequenceToContactMap()
+    dataframe = pd.read_csv(os.path.join(MAIN_DIR,"UniProt\\uniprot_df.csv"))
+    strategy = SequenceDiffusionModel()
     trainer = Trainer(dataframe, strategy, batch_size=16, test_size=0.2)
     trainer.train(epochs=100)

@@ -10,7 +10,7 @@ from utils.padding_functions import padd_sequence
 
 
 class DiffusionModule(nn.Module):
-    def __init__(self, hidden_size, timesteps=100, num_layers=3, noise_steps=5):
+    def __init__(self, hidden_size, timesteps=10, num_layers=3, noise_steps=5):
         super(DiffusionModule, self).__init__()
         self.timesteps = timesteps
         self.hidden_size = hidden_size

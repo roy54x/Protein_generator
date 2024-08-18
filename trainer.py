@@ -9,7 +9,7 @@ from torch import optim
 from torch.utils.data import DataLoader, Dataset
 
 from strategies.sequence_to_binding_sequence import SequenceDiffusionModel
-from utils.constants import MIN_SIZE, MAIN_DIR
+from utils.constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS
 from strategies.sequence_to_contact_map import SequenceToContactMap
 
 
@@ -31,6 +31,7 @@ class CustomDataset(Dataset):
 class Trainer:
     def __init__(self, dataframe, strategy, batch_size=32, test_size=0.2):
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) >= MIN_SIZE)]
+        dataframe = dataframe[dataframe['sequence'].apply(lambda seq: all(char in AMINO_ACIDS for char in seq))]
         train_df, test_df = train_test_split(dataframe, test_size=test_size, random_state=42, shuffle=False)
         self.train_loader = DataLoader(CustomDataset(train_df, strategy, "train"), batch_size=batch_size, shuffle=True)
         self.test_loader = DataLoader(CustomDataset(test_df, strategy, "test"), batch_size=batch_size, shuffle=False)

@@ -69,8 +69,9 @@ class Trainer:
                     avg_train_loss = total_train_loss / total_train_samples
                     end_time = time.time()
                     batch_time = end_time - start_time
-                    print(
-                        f'Epoch {epoch + 1}, Batch {batch_count} out of {self.num_batches}, Training Loss: {avg_train_loss:.4f}, Time for 100 Batches: {batch_time:.4f} seconds')
+                    print(f'Epoch {epoch + 1}, Batch {batch_count} out of {self.num_batches}, '
+                          f'Training Loss: {avg_train_loss:.4f}, '
+                          f'Time for 100 Batches: {batch_time:.4f} seconds')
                     start_time = end_time
                     total_train_loss = 0
                     total_train_samples = 0

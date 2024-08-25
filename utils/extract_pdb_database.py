@@ -1,3 +1,4 @@
+import itertools
 import json
 import os
 import pandas as pd
@@ -42,7 +43,7 @@ def get_pdb_ids_from_uniprot_xml(xml_file, json_path='pdn_ids.json'):
     with open(json_path, 'w') as f:
         json.dump(data, f)
 
-    return list(set(data.values()))  # Remove duplicates
+    return list(set(itertools.chain(*data.values())))  # Remove duplicates
 
 
 def fetch_pdb_ids(uniprot_id):
@@ -64,21 +65,22 @@ def fetch_pdb_ids(uniprot_id):
 def get_pdb_data(pdb_ids, output_path):
     data = []
     for pdb_id in pdb_ids:
-        pdb_file = download_pdb(pdb_id, os.path.join(output_path, 'pdb_files'))
-        structure = parser.get_structure(pdb_id, pdb_file)
-        structure_info = get_structure_info(structure)
-        chain_ids, chain_sequences, chain_coords = extract_amino_acid_chains(structure)
+        try:
+            pdb_file = download_pdb(pdb_id, os.path.join(output_path, 'pdb_files'))
+            structure = parser.get_structure(pdb_id, pdb_file)
+            structure_info = get_structure_info(structure)
+            chain_ids, chain_sequences, chain_coords = extract_amino_acid_chains(structure)
 
-        for chain_id, sequence, coords in zip(chain_ids, chain_sequences, chain_coords):
-            contact_map = get_contact_map_from_coords(coords)
-            data.append({
-                'pdb_id': pdb_id,
-                'chain_id': chain_id,
-                'sequence': sequence,
-                "coords": coords,
-                "contact_map": contact_map,
-                "structure_info": structure_info
-            })
+            for chain_id, sequence, coords in zip(chain_ids, chain_sequences, chain_coords):
+                data.append({
+                    'pdb_id': pdb_id,
+                    'chain_id': chain_id,
+                    'sequence': sequence,
+                    "coords": coords,
+                    "structure_info": structure_info
+                })
+        except Exception as err:
+            print(err)
     df = pd.DataFrame(data)
     df.to_json(os.path.join(output_path, "pdb_df.json"), index=False)
     df.to_csv(os.path.join(output_path, "pdb_df.csv"), index=False)
@@ -88,8 +90,10 @@ def get_pdb_data(pdb_ids, output_path):
 def download_pdb(pdb_id, pdb_dir='pdb_files'):
     if not os.path.exists(pdb_dir):
         os.makedirs(pdb_dir)
-    pdb_list.retrieve_pdb_file(pdb_id, pdir=pdb_dir, file_format='pdb')
-    return os.path.join(pdb_dir, f'pdb{pdb_id.lower()}.ent')
+    pdb_file_path = os.path.join(pdb_dir, f'pdb{pdb_id.lower()}.ent')
+    if not os.path.exists(pdb_file_path):
+        pdb_list.retrieve_pdb_file(pdb_id, pdir=pdb_dir, file_format='pdb')
+    return pdb_file_path
 
 
 def extract_amino_acid_chains(structure):
@@ -111,20 +115,6 @@ def extract_amino_acid_chains(structure):
             chain_sequences.append(''.join(sequence))
             chain_coords.append(np.array(coords))
     return chain_ids, chain_sequences, chain_coords
-
-
-def get_contact_map_from_coords(ca_coords, threshold=8.0):
-    num_residues = len(ca_coords)
-    contact_map = np.zeros((num_residues, num_residues))
-
-    for i in range(num_residues):
-        for j in range(i + 1, num_residues):
-            distance = np.linalg.norm(ca_coords[i] - ca_coords[j])
-            if distance < threshold:
-                contact_map[i, j] = 1
-                contact_map[j, i] = 1
-
-    return contact_map
 
 
 # 5. Function to extract structure info

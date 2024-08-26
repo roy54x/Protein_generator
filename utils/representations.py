@@ -9,7 +9,7 @@ def get_contact_map_from_coords(ca_coords, threshold=8.0, soft_map=True):
     num_residues = len(ca_coords)
     contact_map = np.zeros((num_residues, num_residues))
     for i in range(num_residues):
-        for j in range(i + 1, num_residues):
+        for j in range(i, num_residues):
             distance = np.linalg.norm(ca_coords[i] - ca_coords[j])
             if soft_map:
                 value = distance_to_score(distance)

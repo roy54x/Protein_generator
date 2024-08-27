@@ -62,8 +62,12 @@ def fetch_pdb_ids(uniprot_id):
     return pdb_ids
 
 
-def get_pdb_data(pdb_ids, output_path):
+def get_pdb_data(pdb_ids, output_path, num_samples_in_df=50000):
     data = []
+    file_index = 0
+
+    os.makedirs(output_path, exist_ok=True)
+
     for pdb_id in pdb_ids:
         try:
             pdb_file = download_pdb(pdb_id, os.path.join(output_path, 'pdb_files'))
@@ -79,12 +83,25 @@ def get_pdb_data(pdb_ids, output_path):
                     "coords": coords,
                     "structure_info": structure_info
                 })
+
+            if len(data) >= num_samples_in_df:
+                df = pd.DataFrame(data)
+                save_dataframe(df, output_path, file_index)
+                file_index += 1
+                data = []  # Reset data
+
         except Exception as err:
             print(err)
-    df = pd.DataFrame(data)
-    df.to_json(os.path.join(output_path, "pdb_df.json"), index=False)
-    df.to_csv(os.path.join(output_path, "pdb_df.csv"), index=False)
-    return df
+
+    # Save remaining data if any
+    if data:
+        df = pd.DataFrame(data)
+        save_dataframe(df, output_path, file_index)
+
+
+def save_dataframe(df, output_path, file_index):
+    df.to_csv(os.path.join(output_path, f"pdb_df_{file_index}.csv"), index=False)
+    df.to_json(os.path.join(output_path, f"pdb_df_{file_index}.json"), orient='records', lines=True)
 
 
 def download_pdb(pdb_id, pdb_dir='pdb_files'):
@@ -128,5 +145,4 @@ def get_structure_info(structure):
 
 pdb_ids = get_pdb_ids_from_uniprot_xml(os.path.join(MAIN_DIR, r"UniProt\uniprot_sprot.xml\uniprot_sprot.xml"),
                                        os.path.join(MAIN_DIR, "PDB", "UniProt2PBD.json"))
-df = get_pdb_data(pdb_ids, output_path=os.path.join(MAIN_DIR, "PDB"))
-print(df.head())
+get_pdb_data(pdb_ids, output_path=os.path.join(MAIN_DIR, "PDB", "pdb_data"))

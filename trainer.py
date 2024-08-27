@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from strategies.sequence_to_binding_sequence import SequenceDiffusionModel
 from utils.constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS
-from strategies.sequence_to_contact_map import SequenceToContactMap
+from strategies.sequence_to_distogram import SequenceToDistogram
 
 
 class CustomDataset(Dataset):
@@ -53,6 +53,7 @@ class Trainer:
             total_train_samples = 0
             batch_count = 0
             start_time = time.time()
+            num_batchs_in_epoch = len(self.train_loader)
 
             for inputs, ground_truth in self.train_loader:
                 self.optimizer.zero_grad()
@@ -64,8 +65,7 @@ class Trainer:
                 total_train_samples += len(inputs)
                 batch_count += 1
 
-                # Print training loss every 100 batches
-                if batch_count % 100 == 0:
+                if batch_count % (num_batchs_in_epoch//5) == 0:
                     avg_train_loss = total_train_loss / total_train_samples
                     end_time = time.time()
                     batch_time = end_time - start_time

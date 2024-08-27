@@ -9,10 +9,10 @@ from strategies.base import Base
 from utils.padding_functions import padd_sequence, padd_contact_map
 
 
-class SequenceToContactMap(Base):
+class SequenceToDistogram(Base):
 
     def __init__(self):
-        super(SequenceToContactMap, self).__init__()
+        super(SequenceToDistogram, self).__init__()
 
         # Transformer encoder layer
         config = transformers.RobertaConfig(
@@ -43,9 +43,9 @@ class SequenceToContactMap(Base):
         x_tensor, mask_tensor = padd_sequence(sequence, MAX_SIZE)
 
         # Get ground truth
-        contact_map = np.array(data['contact_map'])
-        contact_map = contact_map[start: end, start: end]
-        ground_truth = padd_contact_map(contact_map, MAX_SIZE)
+        distogram = np.array(data['distogram'])
+        distogram = distogram[start: end, start: end]
+        ground_truth = padd_contact_map(distogram, MAX_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth
 

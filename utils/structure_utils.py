@@ -15,29 +15,13 @@ def get_contact_map_from_coords(ca_coords, soft_map=False, threshold=8.0, decay_
         return None
 
     ca_coords = np.array(ca_coords, dtype="float32")
-    if len(ca_coords) <= 150:
-        diff = ca_coords[:, np.newaxis, :] - ca_coords[np.newaxis, :, :]
-        distances = np.linalg.norm(diff, axis=-1)
+    diff = ca_coords[:, np.newaxis, :] - ca_coords[np.newaxis, :, :]
+    distances = np.linalg.norm(diff, axis=-1)
 
-        if soft_map:
-            contact_map = np.exp(-decay_rate * distances).astype(int)
-        else:
-            contact_map = np.where(distances < threshold, 1.0, 0.0)
-
+    if soft_map:
+        contact_map = np.exp(-decay_rate * distances).astype(int)
     else:
-        num_residues = len(ca_coords)
-        contact_map = np.zeros((num_residues, num_residues), dtype="float32")
-        for i in range(num_residues):
-            for j in range(i, num_residues):
-                distance = np.linalg.norm(ca_coords[i] - ca_coords[j])
-                if soft_map:
-                    value = np.exp(-decay_rate * distance)
-                    contact_map[i, j] = value
-                    contact_map[j, i] = value
-                else:
-                    if distance < threshold:
-                        contact_map[i, j] = 1.0
-                        contact_map[j, i] = 1.0
+        contact_map = np.where(distances < threshold, 1.0, 0.0)
 
     return contact_map
 

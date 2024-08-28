@@ -62,11 +62,12 @@ def fetch_pdb_ids(uniprot_id):
     return pdb_ids
 
 
-def get_pdb_data(pdb_ids, output_path, num_samples_in_df=50000):
+def get_pdb_data(pdb_ids, output_path, dataframe_dir_name="pdb_data", num_samples_in_df=50000):
     data = []
     file_index = 0
 
-    os.makedirs(output_path, exist_ok=True)
+    dataframe_output_dir = os.path.join(output_path, dataframe_dir_name)
+    os.makedirs(dataframe_output_dir, exist_ok=True)
 
     for pdb_id in pdb_ids:
         try:
@@ -86,7 +87,7 @@ def get_pdb_data(pdb_ids, output_path, num_samples_in_df=50000):
 
             if len(data) >= num_samples_in_df:
                 df = pd.DataFrame(data)
-                save_dataframe(df, output_path, file_index)
+                save_dataframe(df, dataframe_output_dir, file_index)
                 file_index += 1
                 data = []  # Reset data
 
@@ -96,7 +97,7 @@ def get_pdb_data(pdb_ids, output_path, num_samples_in_df=50000):
     # Save remaining data if any
     if data:
         df = pd.DataFrame(data)
-        save_dataframe(df, output_path, file_index)
+        save_dataframe(df, dataframe_output_dir, file_index)
 
 
 def save_dataframe(df, output_path, file_index):
@@ -145,4 +146,4 @@ def get_structure_info(structure):
 
 pdb_ids = get_pdb_ids_from_uniprot_xml(os.path.join(MAIN_DIR, r"UniProt\uniprot_sprot.xml\uniprot_sprot.xml"),
                                        os.path.join(MAIN_DIR, "PDB", "UniProt2PBD.json"))
-get_pdb_data(pdb_ids, output_path=os.path.join(MAIN_DIR, "PDB", "pdb_data"))
+get_pdb_data(pdb_ids, output_path=os.path.join(MAIN_DIR, "PDB"))

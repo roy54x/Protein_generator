@@ -39,20 +39,18 @@ class SequenceToDistogram(Base):
     def load_inputs_and_ground_truth(self, data):
         sequence = data['sequence']
 
-        # Get input
         if self.training:
             start, end = self.get_augmentation_indices(len(sequence))
-            sequence = sequence[start: end]
         else:
-            sequence = sequence[:MAX_TRAINING_SIZE]
+            start, end = 0, MAX_TRAINING_SIZE
+
+        # Get input
+        sequence = sequence[start: end]
         x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
         # Get ground truth
         distogram = get_distogram(data["coords"])
-        if self.training:
-            distogram = distogram[start: end, start: end]
-        else:
-            distogram = distogram[:MAX_TRAINING_SIZE, :MAX_TRAINING_SIZE]
+        distogram = distogram[start: end, start: end]
         distogram = normalize(distogram)
         ground_truth = padd_contact_map(distogram, MAX_TRAINING_SIZE)
 

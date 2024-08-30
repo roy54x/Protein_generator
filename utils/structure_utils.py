@@ -12,7 +12,7 @@ from constants import MAIN_DIR, MAX_SIZE
 def get_distogram(ca_coords):
     print("number of amino acids to process: " + str(len(ca_coords)))
     if len(ca_coords) <= 1 or len(ca_coords) > MAX_SIZE:
-        return np.nan
+        return None
 
     ca_coords = np.array(ca_coords, dtype="float16")
     diff = ca_coords[:, np.newaxis, :] - ca_coords[np.newaxis, :, :]
@@ -22,12 +22,14 @@ def get_distogram(ca_coords):
 
 def get_contact_map(ca_coords, threshold=8.0):
     distances = get_distogram(ca_coords)
-    return np.where(distances < threshold, 1.0, 0.0).astype(int)
+    if distances is not None:
+        return np.where(distances < threshold, 1.0, 0.0).astype(int)
 
 
 def get_soft_contact_map(ca_coords, decay_rate=0.5):
     distances = get_distogram(ca_coords)
-    return np.exp(-decay_rate * distances)
+    if distances is not None:
+        return np.exp(-decay_rate * distances).astype("float16")
 
 
 def optimize_points_from_distogram(distogram, n_init=4, max_iter=300, random_state=None):
@@ -92,7 +94,7 @@ def plot_protein_atoms(predicted_points, ground_truth_points, title="Protein 3D 
 
 
 if __name__ == '__main__':
-    input_dir = os.path.join(MAIN_DIR, "PDB", "pdb_data_270000")
+    input_dir = os.path.join(MAIN_DIR, "PDB", "pdb_data_230000")
     for filename in os.listdir(input_dir):
         if filename.endswith('.json'):
             path = os.path.join(input_dir, filename)

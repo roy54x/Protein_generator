@@ -8,7 +8,7 @@ import numpy as np
 from Bio.SeqUtils import seq1
 from lxml import etree
 
-from utils.constants import AMINO_ACIDS, MAIN_DIR
+from utils.constants import AMINO_ACIDS, MAIN_DIR, NUM_SAMPLES_IN_DATAFRAME
 
 pdb_list = PDB.PDBList()
 parser = PDB.PDBParser()
@@ -62,7 +62,7 @@ def fetch_pdb_ids(uniprot_id):
     return pdb_ids
 
 
-def get_pdb_data(pdb_ids, output_path, dataframe_dir_name="pdb_data", num_samples_in_df=10000):
+def get_pdb_data(pdb_ids, output_path, dataframe_dir_name="pdb_data", num_samples_in_df=NUM_SAMPLES_IN_DATAFRAME):
     data = []
     file_index = 0
 

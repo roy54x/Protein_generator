@@ -98,7 +98,7 @@ class Trainer:
 
                     for inputs, ground_truth in test_loader:
                         outputs = self.strategy((x.to(self.device) for x in inputs))
-                        loss = self.strategy.compute_loss((x for x in outputs), ground_truth.to(self.device))
+                        loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
                         total_test_loss += loss.item()
                         total_test_samples += len(inputs)
 

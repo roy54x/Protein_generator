@@ -2,13 +2,15 @@ import torch
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+
+from strategies.sequence_to_contact_map import SequenceToContactMap
 from utils.structure_utils import optimize_points_from_distogram, align_points, plot_protein_atoms
 
 
-def load_json_data(json_path, id):
+def load_json_data(json_path, pdb_id, chain_id):
     with open(json_path, 'r') as f:
-        data = json.load(f)
-    return data[str(id)]
+        df = json.load(f)
+    return df.loc[(df['pdb_id'] == pdb_id) & (df['chain_id'] == chain_id)]
 
 
 def plot_distograms(predicted_distogram, ground_truth_distogram):
@@ -24,17 +26,16 @@ def plot_distograms(predicted_distogram, ground_truth_distogram):
 
 
 if __name__ == "__main__":
-
-    json_path = ""
-    pdb_id = ""
+    json_path = "D:\python project\data\Proteins\PDB\pdb_data_130000\pdb_df_9.json"
+    pdb_id = "6VMH"
+    chain_id = "B"
     model_path = ""
-    data = load_json_data(json_path, id)
-    sequence = data['sequence']
-    ground_truth_contact_map = np.array(data['soft_contact_map'])
-    ground_truth_coords = np.array(data['coords'])
 
+    data = load_json_data(json_path, pdb_id, chain_id)
+    ground_truth_coords = np.array(data["coords"], dtype="float16")
+    (x_tensor, mask_tensor), ground_truth_contact_map = SequenceToContactMap().load_inputs_and_ground_truth(data)
     model = torch.load(model_path, map_location=torch.device('cpu'))
-    predicted_contact_map = model(sequence)
+    predicted_contact_map = model((x_tensor, mask_tensor))
 
     # Plot the predicted distogram and the ground truth distogram
     plot_distograms(predicted_contact_map, ground_truth_contact_map)

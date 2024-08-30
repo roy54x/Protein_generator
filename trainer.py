@@ -56,19 +56,16 @@ class Trainer:
 
     def train(self, epochs=10):
         for epoch in range(epochs):
-
-            # Process each training file one by one
+            batch_count = 0
+            total_train_loss = 0
+            total_train_samples = 0
+            start_time = time.time()
             self.strategy.train()
-            for epoch in range(epochs):
-                batch_count = 0
-                total_train_loss = 0
-                total_train_samples = 0
-                start_time = time.time()
 
-                for train_file in self.train_files:
-                    train_loader = self.get_dataloader(train_file, mode="train")
+            for train_file in self.train_files:
+                train_loader = self.get_dataloader(train_file, mode="train")
 
-                    for inputs, ground_truth in train_loader:
+                for inputs, ground_truth in train_loader:
                         self.optimizer.zero_grad()
                         outputs = self.strategy((x.to(self.device) for x in inputs))
                         loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
@@ -95,8 +92,10 @@ class Trainer:
             total_test_loss = 0
             total_test_samples = 0
             with torch.no_grad():
+
                 for test_file in self.test_files:
                     test_loader = self.get_dataloader(test_file, mode="test")
+
                     for inputs, ground_truth in test_loader:
                         outputs = self.strategy((x.to(self.device) for x in inputs))
                         loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))

@@ -54,7 +54,7 @@ class Trainer:
         return DataLoader(CustomDataset(dataframe, self.strategy), batch_size=self.batch_size,
                           shuffle=(mode == "train"))
 
-    def train(self, epochs=10):
+    def train(self, epochs=100):
         for epoch in range(epochs):
             batch_count = 0
             total_train_loss = 0
@@ -126,5 +126,5 @@ class Trainer:
 if __name__ == '__main__':
     data_path = os.path.join(MAIN_DIR,"PDB\pdb_data_130000")
     strategy = SequenceToDistogram()
-    trainer = Trainer(data_path, strategy, batch_size=16, test_size=0.2)
-    trainer.train(epochs=100)
+    trainer = Trainer(data_path, strategy, batch_size=16, test_size=0.15)
+    trainer.train()

@@ -3,7 +3,6 @@ import torch
 
 from constants import AMINO_ACID_TO_INDEX
 
-
 def padd_sequence(sequence, padding_size):
     tokens = [AMINO_ACID_TO_INDEX.get(aa, -1) for aa in sequence]  # -1 for unknown amino acids
     mask = [1] * len(tokens) + [0] * (padding_size - len(tokens))

@@ -8,6 +8,7 @@ from constants import AMINO_ACIDS, MAX_TRAINING_SIZE, DECAY_RATE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence, padd_contact_map
 from utils.structure_utils import get_soft_contact_map, get_distogram
+from utils.utils import normalize
 
 
 class SequenceToDistogram(Base):
@@ -52,8 +53,7 @@ class SequenceToDistogram(Base):
             distogram = distogram[start: end, start: end]
         else:
             distogram = distogram[:MAX_TRAINING_SIZE, :MAX_TRAINING_SIZE]
-        distogram = np.where(np.ptp(distogram) > 0,
-                             (distogram - np.min(distogram)) / np.ptp(distogram), 0)
+        distogram = normalize(distogram)
         ground_truth = padd_contact_map(distogram, MAX_TRAINING_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth

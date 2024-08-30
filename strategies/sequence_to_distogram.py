@@ -43,7 +43,7 @@ class SequenceToDistogram(Base):
             start, end = self.get_augmentation_indices(len(sequence))
             sequence = sequence[start: end]
         else:
-            sequence = sequence[:MAX_TRAINING_SIZE]
+            sequence = sequence[:MAX_TRAINING_SIZE, :MAX_TRAINING_SIZE]
         x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
         # Get ground truth
@@ -51,7 +51,7 @@ class SequenceToDistogram(Base):
         if self.training:
             distogram = distogram[start: end, start: end]
         else:
-            distogram = distogram[:MAX_TRAINING_SIZE]
+            distogram = distogram[:MAX_TRAINING_SIZE, :MAX_TRAINING_SIZE]
         ground_truth = padd_contact_map(distogram, MAX_TRAINING_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth

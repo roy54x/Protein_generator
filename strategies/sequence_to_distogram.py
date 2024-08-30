@@ -4,15 +4,15 @@ import torch.nn.functional as F
 import numpy as np
 import transformers
 
-from utils.constants import AMINO_ACIDS, MAX_SIZE
+from utils.constants import AMINO_ACIDS, MAX_TRAINING_SIZE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence, padd_contact_map
 
 
-class SequenceToDistogram(Base):
+class SequenceToContactMap(Base):
 
     def __init__(self):
-        super(SequenceToDistogram, self).__init__()
+        super(SequenceToContactMap, self).__init__()
 
         # Transformer encoder layer
         config = transformers.RobertaConfig(
@@ -40,12 +40,12 @@ class SequenceToDistogram(Base):
 
         # Get input
         sequence = sequence[start: end]
-        x_tensor, mask_tensor = padd_sequence(sequence, MAX_SIZE)
+        x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
         # Get ground truth
-        distogram = np.array(data['distogram'])
-        distogram = distogram[start: end, start: end]
-        ground_truth = padd_contact_map(distogram, MAX_SIZE)
+        contact_map = np.array(data['soft_contact_map'])
+        contact_map = contact_map[start: end, start: end]
+        ground_truth = padd_contact_map(contact_map, MAX_TRAINING_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth
 
@@ -57,7 +57,7 @@ class SequenceToDistogram(Base):
 
         # Outer product to get pairwise interactions
         pairwise_interactions = torch.einsum('bik,bjk->bij', transformer_output, transformer_output)
-        outer_product = pairwise_interactions.view(-1, MAX_SIZE, MAX_SIZE).unsqueeze(1)  # Shape: (batch_size, 1, max_size, max_size)
+        outer_product = pairwise_interactions.view(-1, MAX_TRAINING_SIZE, MAX_TRAINING_SIZE).unsqueeze(1)  # Shape: (batch_size, 1, max_size, max_size)
 
         # Apply convolutional layers
         output = self.conv_layers(outer_product)  # Shape: (batch_size, 1, max_size, max_size)

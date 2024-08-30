@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import transformers
 
-from utils.constants import AMINO_ACIDS, MAX_SIZE, AMINO_ACID_TO_INDEX
+from utils.constants import AMINO_ACIDS, MAX_TRAINING_SIZE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence
 
@@ -35,12 +35,13 @@ class SequenceDiffusionModel(Base):
         super(SequenceDiffusionModel, self).__init__()
         self.vocab_size = len(AMINO_ACIDS) + 1
         self.min_split_percent, self.max_split_percent = 0.5, 0.9
-        self.max_input_size, self.max_output_size = int(MAX_SIZE * self.max_split_percent), int(MAX_SIZE * self.min_split_percent)
+        self.max_input_size, self.max_output_size = int(MAX_TRAINING_SIZE * self.max_split_percent), int(
+            MAX_TRAINING_SIZE * self.min_split_percent)
         self.hidden_size = 8
 
         config = transformers.RobertaConfig(
             vocab_size=self.vocab_size,
-            max_position_embeddings=self.max_input_size+2,
+            max_position_embeddings=self.max_input_size + 2,
             hidden_size=self.hidden_size,
             num_attention_heads=4,
             num_hidden_layers=4,

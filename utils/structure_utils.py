@@ -6,13 +6,13 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.manifold import MDS
 
-from utils.constants import MAIN_DIR
+from utils.constants import MAIN_DIR, MAX_SIZE
 
 
 def get_distogram(ca_coords):
     print("number of amino acids to process: " + str(len(ca_coords)))
-    if len(ca_coords) <= 1:
-        return None
+    if len(ca_coords) <= 1 or len(ca_coords) > MAX_SIZE:
+        return np.nan
 
     ca_coords = np.array(ca_coords, dtype="float32")
     diff = ca_coords[:, np.newaxis, :] - ca_coords[np.newaxis, :, :]

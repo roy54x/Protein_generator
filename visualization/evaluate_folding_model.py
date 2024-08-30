@@ -4,6 +4,7 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 
+from constants import DECAY_RATE
 from strategies.sequence_to_contact_map import SequenceToContactMap
 from utils.structure_utils import optimize_points_from_distogram, align_points, plot_protein_atoms, \
     get_distogram_from_soft_contact_map
@@ -45,7 +46,7 @@ if __name__ == "__main__":
     plot_distograms(predicted_contact_map, ground_truth_contact_map)
 
     # Plot the aligned predicted coordinates with the ground truth coordinates
-    distogram = get_distogram_from_soft_contact_map(predicted_contact_map)
+    distogram = get_distogram_from_soft_contact_map(predicted_contact_map, decay_rate=DECAY_RATE)
     predicted_coords = optimize_points_from_distogram(distogram)
     aligned_predicted_coords = align_points(predicted_coords, ground_truth_coords)
     plot_protein_atoms(aligned_predicted_coords, ground_truth_coords)

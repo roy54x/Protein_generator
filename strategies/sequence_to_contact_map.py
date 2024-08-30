@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import transformers
 
-from constants import AMINO_ACIDS, MAX_TRAINING_SIZE
+from constants import AMINO_ACIDS, MAX_TRAINING_SIZE, DECAY_RATE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence, padd_contact_map
 from utils.structure_utils import get_soft_contact_map
@@ -46,7 +46,7 @@ class SequenceToContactMap(Base):
         x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
         # Get ground truth
-        contact_map = get_soft_contact_map(data["coords"], decay_rate=0.25)
+        contact_map = get_soft_contact_map(data["coords"], decay_rate=DECAY_RATE)
         if self.training:
             contact_map = contact_map[start: end, start: end]
         ground_truth = padd_contact_map(contact_map, MAX_TRAINING_SIZE)

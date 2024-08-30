@@ -52,7 +52,7 @@ class SequenceToDistogram(Base):
             distogram = distogram[start: end, start: end]
         else:
             distogram = distogram[:MAX_TRAINING_SIZE, :MAX_TRAINING_SIZE]
-        distogram = (distogram - np.min(distogram)) / (np.ptp(distogram) or 1)
+        distogram = np.where(np.ptp(distogram) > 0, (distogram - np.min(distogram)) / np.ptp(distogram), 0)
         ground_truth = padd_contact_map(distogram, MAX_TRAINING_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth

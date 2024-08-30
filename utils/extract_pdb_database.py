@@ -62,7 +62,7 @@ def fetch_pdb_ids(uniprot_id):
     return pdb_ids
 
 
-def get_pdb_data(pdb_ids, output_path, dataframe_dir_name="pdb_data", num_samples_in_df=50000):
+def get_pdb_data(pdb_ids, output_path, dataframe_dir_name="pdb_data", num_samples_in_df=10000):
     data = []
     file_index = 0
 

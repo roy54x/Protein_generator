@@ -9,27 +9,56 @@ from sklearn.manifold import MDS
 from utils.constants import MAIN_DIR
 
 
-def get_contact_map_from_coords(ca_coords, soft_map=False, threshold=8.0, decay_rate=0.5):
-    print(len(ca_coords))
+def get_distogram(ca_coords):
+    print("number of amino acids to process: " + str(len(ca_coords)))
     if len(ca_coords) <= 1:
         return None
 
     ca_coords = np.array(ca_coords, dtype="float32")
     diff = ca_coords[:, np.newaxis, :] - ca_coords[np.newaxis, :, :]
     distances = np.linalg.norm(diff, axis=-1)
+    return distances
 
-    if soft_map:
-        contact_map = np.exp(-decay_rate * distances).astype(int)
-    else:
-        contact_map = np.where(distances < threshold, 1.0, 0.0)
 
-    return contact_map
+def get_contact_map(ca_coords, threshold=8.0):
+    distances = get_distogram(ca_coords)
+    return np.where(distances < threshold, 1.0, 0.0).astype(int)
+
+
+def get_soft_contact_map(ca_coords, decay_rate=0.5):
+    distances = get_distogram(ca_coords)
+    return np.exp(-decay_rate * distances)
 
 
 def optimize_points_from_distogram(distogram, n_init=4, max_iter=300, random_state=None):
     mds = MDS(n_components=3, dissimilarity="precomputed", n_init=n_init, max_iter=max_iter, random_state=random_state)
     points = mds.fit_transform(distogram)
     return points
+
+
+def align_points(predicted_points, ground_truth_points):
+    centroid_pred = np.mean(predicted_points, axis=0)
+    centroid_gt = np.mean(ground_truth_points, axis=0)
+    pred_centered = predicted_points - centroid_pred
+    gt_centered = ground_truth_points - centroid_gt
+
+    # Compute the optimal rotation matrix
+    H = np.dot(pred_centered.T, gt_centered)
+    U, S, Vt = np.linalg.svd(H)
+    R = np.dot(Vt.T, U.T)
+
+    # Check for reflection (det(R) should be 1 for a proper rotation)
+    if np.linalg.det(R) < 0:
+        Vt[-1, :] *= -1
+        R = np.dot(Vt.T, U.T)
+
+    # Apply the rotation matrix to the predicted points
+    transformed_predicted_points = np.dot(pred_centered, R)
+
+    # Translate the transformed points
+    transformed_predicted_points += centroid_gt
+
+    return transformed_predicted_points
 
 
 def plot_protein_points_cartoon(ground_truth_points, predicted_points, title="Protein 3D Points"):
@@ -67,14 +96,11 @@ if __name__ == '__main__':
     for filename in os.listdir(input_dir):
         if filename.endswith('.json'):
             path = os.path.join(input_dir, filename)
-            pdb_df = pd.read_json(path)
+            pdb_df = pd.read_json(path, lines=True)
 
             # Process DataFrame
-            pdb_df['contact_map'] = pdb_df["coords"].apply(get_contact_map_from_coords)
-            pdb_df['distogram'] = pdb_df["coords"].apply(
-                lambda coords: get_contact_map_from_coords(coords, soft_map=True))
+            pdb_df['soft_contact_map'] = pdb_df["coords"].apply(get_soft_contact_map)
 
             # Save processed DataFrame to new file
             output_path = os.path.join(input_dir, filename)
             pdb_df.to_json(path)
-

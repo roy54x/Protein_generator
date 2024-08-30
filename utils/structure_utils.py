@@ -31,6 +31,12 @@ def get_soft_contact_map(ca_coords, decay_rate=0.5):
         return np.exp(-decay_rate * distances).astype("float16")
 
 
+def get_distogram_from_soft_contact_map(contact_map, decay_rate=0.5):
+    distances = -np.log(contact_map) / decay_rate
+    distances = (distances + distances.T) / 2
+    return distances.astype("float16")
+
+
 def optimize_points_from_distogram(distogram, n_init=4, max_iter=300, random_state=None):
     mds = MDS(n_components=3, dissimilarity="precomputed", n_init=n_init, max_iter=max_iter, random_state=random_state)
     points = mds.fit_transform(distogram)

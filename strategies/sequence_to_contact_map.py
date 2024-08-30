@@ -37,15 +37,18 @@ class SequenceToContactMap(Base):
 
     def load_inputs_and_ground_truth(self, data):
         sequence = data['sequence']
-        start, end = self.get_augmentation_indices(len(sequence))
+
+        if self.training:
+            start, end = self.get_augmentation_indices(len(sequence))
+            sequence = sequence[start: end]
 
         # Get input
-        sequence = sequence[start: end]
         x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
         # Get ground truth
-        contact_map = get_soft_contact_map(data["coords"])
-        contact_map = contact_map[start: end, start: end]
+        contact_map = get_soft_contact_map(data["coords"], decay_rate=0.25)
+        if self.training:
+            contact_map = contact_map[start: end, start: end]
         ground_truth = padd_contact_map(contact_map, MAX_TRAINING_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth

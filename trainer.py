@@ -59,25 +59,35 @@ class Trainer:
 
             # Process each training file one by one
             self.strategy.train()
-            for train_file in self.train_files:
-                train_loader = self.get_dataloader([train_file], mode="train")
+            for epoch in range(epochs):
+                batch_count = 0
                 total_train_loss = 0
                 total_train_samples = 0
                 start_time = time.time()
 
-                for inputs, ground_truth in train_loader:
-                    self.optimizer.zero_grad()
-                    outputs = self.strategy((x.to(self.device) for x in inputs))
-                    loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
-                    loss.backward()
-                    self.optimizer.step()
+                for train_file in self.train_files:
+                    train_loader = self.get_dataloader(train_file, mode="train")
 
-                    total_train_loss += loss.item()
-                    total_train_samples += len(inputs)
+                    for inputs, ground_truth in train_loader:
+                        self.optimizer.zero_grad()
+                        outputs = self.strategy((x.to(self.device) for x in inputs))
+                        loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
+                        loss.backward()
+                        self.optimizer.step()
 
-                avg_train_loss = total_train_loss / total_train_samples
-                print(f'Epoch {epoch + 1}, Train File {train_file}, Training Loss: {avg_train_loss:.4f}. '
-                      f'Time taken: {time.time()-start_time:.4f} seconds.')
+                        total_train_loss += loss.item()
+                        total_train_samples += len(inputs)
+                        batch_count += 1
+
+                        # Print every 100 batches
+                        if batch_count % 100 == 0:
+                            avg_train_loss = total_train_loss / total_train_samples
+                            elapsed_time = time.time() - start_time
+                            print(f'Epoch {epoch + 1}, Batch {batch_count}, Training Loss: {avg_train_loss:.4f}, '
+                                  f'Time taken: {elapsed_time:.4f} seconds.')
+                            total_train_loss = 0
+                            total_train_samples = 0
+                            start_time = time.time()
 
             # Evaluate on test data
             self.strategy.eval()
@@ -85,7 +95,7 @@ class Trainer:
             total_test_samples = 0
             with torch.no_grad():
                 for test_file in self.test_files:
-                    test_loader = self.get_dataloader([test_file], mode="test")
+                    test_loader = self.get_dataloader(test_file, mode="test")
                     for inputs, ground_truth in test_loader:
                         outputs = self.strategy((x.to(self.device) for x in inputs))
                         loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
@@ -114,9 +124,9 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    dataframe = pd.read_json(os.path.join(MAIN_DIR,"PDB\pdb_df_400.json"))
+    data_path = os.path.join(MAIN_DIR,"PDB\pdb_data_20000")
     strategy = SequenceToContactMap()
     #dataframe = pd.read_csv(os.path.join(MAIN_DIR,"UniProt\\uniprot_df.csv"))
     #strategy = SequenceDiffusionModel()
-    trainer = Trainer(dataframe, strategy, batch_size=16, test_size=0.2)
+    trainer = Trainer(data_path, strategy, batch_size=16, test_size=0.2)
     trainer.train(epochs=100)

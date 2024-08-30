@@ -14,7 +14,7 @@ def get_distogram(ca_coords):
     if len(ca_coords) <= 1 or len(ca_coords) > MAX_SIZE:
         return np.nan
 
-    ca_coords = np.array(ca_coords, dtype="float32")
+    ca_coords = np.array(ca_coords, dtype="float16")
     diff = ca_coords[:, np.newaxis, :] - ca_coords[np.newaxis, :, :]
     distances = np.linalg.norm(diff, axis=-1)
     return distances
@@ -61,7 +61,7 @@ def align_points(predicted_points, ground_truth_points):
     return transformed_predicted_points
 
 
-def plot_protein_points_cartoon(ground_truth_points, predicted_points, title="Protein 3D Points"):
+def plot_protein_atoms(predicted_points, ground_truth_points, title="Protein 3D Points"):
     fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111, projection='3d')
 
@@ -92,7 +92,7 @@ def plot_protein_points_cartoon(ground_truth_points, predicted_points, title="Pr
 
 
 if __name__ == '__main__':
-    input_dir = os.path.join(MAIN_DIR, "PDB", "pdb_data")
+    input_dir = os.path.join(MAIN_DIR, "PDB", "pdb_data_270000")
     for filename in os.listdir(input_dir):
         if filename.endswith('.json'):
             path = os.path.join(input_dir, filename)

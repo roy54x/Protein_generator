@@ -39,7 +39,7 @@ class Trainer:
         self.file_paths = [os.path.join(directory, fname) for fname in os.listdir(directory) if fname.endswith('.json')]
         self.train_files, self.test_files = train_test_split(self.file_paths, test_size=test_size, random_state=42,
                                                              shuffle=False)
-        self.train_size = len(self.train_files)*NUM_SAMPLES_IN_DATAFRAME
+        self.train_size = len(self.train_files) * NUM_SAMPLES_IN_DATAFRAME
         self.test_size = len(self.test_files) * NUM_SAMPLES_IN_DATAFRAME
         print(f"number of samples in the train set are: {self.train_size}")
         print(f"number of samples in the test set are: {self.test_size}")

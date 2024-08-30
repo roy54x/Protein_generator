@@ -38,17 +38,20 @@ class SequenceToDistogram(Base):
     def load_inputs_and_ground_truth(self, data):
         sequence = data['sequence']
 
+        # Get input
         if self.training:
             start, end = self.get_augmentation_indices(len(sequence))
             sequence = sequence[start: end]
-
-        # Get input
+        else:
+            sequence = sequence[:MAX_TRAINING_SIZE]
         x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
         # Get ground truth
         distogram = get_distogram(data["coords"])
         if self.training:
             distogram = distogram[start: end, start: end]
+        else:
+            distogram = distogram[:MAX_TRAINING_SIZE]
         ground_truth = padd_contact_map(distogram, MAX_TRAINING_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth
@@ -57,7 +60,8 @@ class SequenceToDistogram(Base):
         x, mask = input
 
         # x is of shape (batch_size, max_size, 1)
-        transformer_output = self.transformer(x, attention_mask=mask).last_hidden_state  # Shape: (batch_size, max_size, max_size)
+        transformer_output = self.transformer(x,
+                                              attention_mask=mask).last_hidden_state  # Shape: (batch_size, max_size, max_size)
 
         # Outer product to get pairwise interactions
         pairwise_interactions = torch.einsum('bik,bjk->bij', transformer_output, transformer_output)
@@ -69,9 +73,11 @@ class SequenceToDistogram(Base):
 
     def compute_loss(self, outputs, ground_truth):
         prediction, mask = outputs
-        mask = mask.unsqueeze(1) * mask.unsqueeze(2) # Shape: (batch_size, max_size, max_size)
+        mask = mask.unsqueeze(1) * mask.unsqueeze(2)  # Shape: (batch_size, max_size, max_size)
         mse_loss = F.mse_loss(prediction * mask, ground_truth * mask, reduction='sum')
         num_valid_elements = mask.sum()
         if num_valid_elements > 0:
             mse_loss = mse_loss / num_valid_elements
+        if mse_loss is None:
+            print("error")
         return mse_loss

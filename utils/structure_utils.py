@@ -31,6 +31,19 @@ def get_soft_contact_map(ca_coords, decay_rate=0.5):
         return np.exp(-decay_rate * distances).astype("float16")
 
 
+def plot_contact_map(predicted_distogram, ground_truth_distogram):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+    axes[0].imshow(predicted_distogram, cmap='viridis')
+    axes[0].set_title("Predicted Distogram")
+
+    axes[1].imshow(ground_truth_distogram, cmap='viridis')
+    axes[1].set_title("Ground Truth Distogram")
+
+    plt.show()
+
+
+
 def get_distogram_from_soft_contact_map(contact_map, decay_rate=0.5):
     distances = -np.log(contact_map) / decay_rate
     distances = (distances + distances.T) / 2

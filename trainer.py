@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
 from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME
-from strategies.sequence_to_contact_map import SequenceToContactMap
+from strategies.sequence_to_distogram import SequenceToDistogram
 
 
 class CustomDataset(Dataset):
@@ -98,7 +98,7 @@ class Trainer:
 
                     for inputs, ground_truth in test_loader:
                         outputs = self.strategy((x.to(self.device) for x in inputs))
-                        loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
+                        loss = self.strategy.compute_loss((x for x in outputs), ground_truth.to(self.device))
                         total_test_loss += loss.item()
                         total_test_samples += len(inputs)
 
@@ -125,6 +125,6 @@ class Trainer:
 
 if __name__ == '__main__':
     data_path = os.path.join(MAIN_DIR,"PDB\pdb_data_130000")
-    strategy = SequenceToContactMap()
+    strategy = SequenceToDistogram()
     trainer = Trainer(data_path, strategy, batch_size=16, test_size=0.2)
     trainer.train(epochs=100)

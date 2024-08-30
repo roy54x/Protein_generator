@@ -7,13 +7,13 @@ import transformers
 from constants import AMINO_ACIDS, MAX_TRAINING_SIZE, DECAY_RATE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence, padd_contact_map
-from utils.structure_utils import get_soft_contact_map
+from utils.structure_utils import get_soft_contact_map, get_distogram
 
 
-class SequenceToContactMap(Base):
+class SequenceToDistogram(Base):
 
     def __init__(self):
-        super(SequenceToContactMap, self).__init__()
+        super(SequenceToDistogram, self).__init__()
 
         # Transformer encoder layer
         config = transformers.RobertaConfig(
@@ -46,10 +46,10 @@ class SequenceToContactMap(Base):
         x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
         # Get ground truth
-        contact_map = get_soft_contact_map(data["coords"], decay_rate=DECAY_RATE)
+        distogram = get_distogram(data["coords"])
         if self.training:
-            contact_map = contact_map[start: end, start: end]
-        ground_truth = padd_contact_map(contact_map, MAX_TRAINING_SIZE)
+            distogram = distogram[start: end, start: end]
+        ground_truth = padd_contact_map(distogram, MAX_TRAINING_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth
 
@@ -65,8 +65,13 @@ class SequenceToContactMap(Base):
 
         # Apply convolutional layers
         output = self.conv_layers(outer_product)  # Shape: (batch_size, 1, max_size, max_size)
-        return output.squeeze(1)  # Shape: (batch_size, max_size, max_size)
+        return output.squeeze(1), mask  # Shape: (batch_size, max_size, max_size)
 
     def compute_loss(self, outputs, ground_truth):
-        # Assuming ground_truth is already of shape (batch_size, max_size, max_size)
-        return F.cross_entropy(outputs, ground_truth)
+        prediction, mask = outputs
+        mask = mask.unsqueeze(1) * mask.unsqueeze(2) # Shape: (batch_size, max_size, max_size)
+        mse_loss = F.mse_loss(prediction * mask, ground_truth * mask, reduction='sum')
+        num_valid_elements = mask.sum()
+        if num_valid_elements > 0:
+            mse_loss = mse_loss / num_valid_elements
+        return mse_loss

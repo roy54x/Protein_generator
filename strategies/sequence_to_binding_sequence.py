@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import transformers
 
-from utils.constants import AMINO_ACIDS, MAX_TRAINING_SIZE
+from constants import AMINO_ACIDS, MAX_TRAINING_SIZE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence
 

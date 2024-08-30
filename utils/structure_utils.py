@@ -6,7 +6,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from sklearn.manifold import MDS
 
-from utils.constants import MAIN_DIR, MAX_SIZE
+from constants import MAIN_DIR, MAX_SIZE
 
 
 def get_distogram(ca_coords):

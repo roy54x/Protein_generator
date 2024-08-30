@@ -8,7 +8,7 @@ import numpy as np
 from Bio.SeqUtils import seq1
 from lxml import etree
 
-from utils.constants import AMINO_ACIDS, MAIN_DIR, NUM_SAMPLES_IN_DATAFRAME
+from constants import AMINO_ACIDS, MAIN_DIR, NUM_SAMPLES_IN_DATAFRAME
 
 pdb_list = PDB.PDBList()
 parser = PDB.PDBParser()

@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from utils.constants import AMINO_ACID_TO_INDEX
+from constants import AMINO_ACID_TO_INDEX
 
 
 def padd_sequence(sequence, padding_size):

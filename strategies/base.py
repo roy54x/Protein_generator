@@ -1,7 +1,7 @@
 import random
 import torch.nn as nn
 
-from utils.constants import MIN_SIZE, MAX_SIZE
+from constants import MIN_SIZE, MAX_SIZE
 
 
 class Base(nn.Module):

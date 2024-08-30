@@ -5,11 +5,9 @@ from datetime import datetime
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
-from torch import optim
 from torch.utils.data import DataLoader, Dataset
 
-from strategies.sequence_to_binding_sequence import SequenceDiffusionModel
-from utils.constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME
+from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME
 from strategies.sequence_to_distogram import SequenceToContactMap
 
 

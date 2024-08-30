@@ -7,6 +7,7 @@ import transformers
 from constants import AMINO_ACIDS, MAX_TRAINING_SIZE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence, padd_contact_map
+from utils.structure_utils import get_soft_contact_map
 
 
 class SequenceToContactMap(Base):
@@ -43,7 +44,7 @@ class SequenceToContactMap(Base):
         x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
         # Get ground truth
-        contact_map = np.array(data['soft_contact_map'])
+        contact_map = get_soft_contact_map(data["coords"])
         contact_map = contact_map[start: end, start: end]
         ground_truth = padd_contact_map(contact_map, MAX_TRAINING_SIZE)
 

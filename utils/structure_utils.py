@@ -10,7 +10,6 @@ from constants import MAIN_DIR, MAX_SIZE
 
 
 def get_distogram(ca_coords):
-    print("number of amino acids to process: " + str(len(ca_coords)))
     if len(ca_coords) <= 1 or len(ca_coords) > MAX_SIZE:
         return None
 
@@ -94,7 +93,7 @@ def plot_protein_atoms(predicted_points, ground_truth_points, title="Protein 3D 
 
 
 if __name__ == '__main__':
-    input_dir = os.path.join(MAIN_DIR, "PDB", "pdb_data_230000")
+    input_dir = os.path.join(MAIN_DIR, "PDB", "pdb_data")
     for filename in os.listdir(input_dir):
         if filename.endswith('.json'):
             path = os.path.join(input_dir, filename)

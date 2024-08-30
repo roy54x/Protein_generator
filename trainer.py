@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
 from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME
-from strategies.sequence_to_distogram import SequenceToContactMap
+from strategies.sequence_to_contact_map import SequenceToContactMap
 
 
 class CustomDataset(Dataset):
@@ -39,13 +39,15 @@ class Trainer:
         self.file_paths = [os.path.join(directory, fname) for fname in os.listdir(directory) if fname.endswith('.json')]
         self.train_files, self.test_files = train_test_split(self.file_paths, test_size=test_size, random_state=42,
                                                              shuffle=False)
-        print(f"number of samples in the train set are: {len(self.train_files)*NUM_SAMPLES_IN_DATAFRAME}")
-        print(f"number of samples in the test set are: {len(self.test_files) * NUM_SAMPLES_IN_DATAFRAME}")
+        self.train_size = len(self.train_files)*NUM_SAMPLES_IN_DATAFRAME
+        self.test_size = len(self.test_files) * NUM_SAMPLES_IN_DATAFRAME
+        print(f"number of samples in the train set are: {self.train_size}")
+        print(f"number of samples in the test set are: {self.test_size}")
         print(f'Number of trainable parameters: '
               f'{sum(p.numel() for p in self.strategy.parameters() if p.requires_grad)}')
 
     def get_dataloader(self, file_path, mode):
-        dataframe = pd.read_json(file_path)
+        dataframe = pd.read_json(file_path, lines=True)
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) >= MIN_SIZE)]
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) <= MAX_SIZE)]
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: all(char in AMINO_ACIDS for char in seq))]
@@ -81,7 +83,8 @@ class Trainer:
                         if batch_count % 100 == 0:
                             avg_train_loss = total_train_loss / total_train_samples
                             elapsed_time = time.time() - start_time
-                            print(f'Epoch {epoch + 1}, Batch {batch_count}, Training Loss: {avg_train_loss:.4f}, '
+                            print(f'Epoch {epoch + 1}, Batch {batch_count} of {self.train_size//self.batch_size}, '
+                                  f'Training Loss: {avg_train_loss:.4f}, '
                                   f'Time taken: {elapsed_time:.4f} seconds.')
                             total_train_loss = 0
                             total_train_samples = 0
@@ -122,9 +125,7 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    data_path = os.path.join(MAIN_DIR,"PDB\pdb_data_20000")
+    data_path = os.path.join(MAIN_DIR,"PDB\pdb_data_130000")
     strategy = SequenceToContactMap()
-    #dataframe = pd.read_csv(os.path.join(MAIN_DIR,"UniProt\\uniprot_df.csv"))
-    #strategy = SequenceDiffusionModel()
     trainer = Trainer(data_path, strategy, batch_size=16, test_size=0.2)
     trainer.train(epochs=100)

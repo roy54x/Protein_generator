@@ -78,6 +78,4 @@ class SequenceToDistogram(Base):
         num_valid_elements = mask.sum()
         if num_valid_elements > 0:
             mse_loss = mse_loss / num_valid_elements
-        if mse_loss is None:
-            print("error")
         return mse_loss

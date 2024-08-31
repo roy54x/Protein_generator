@@ -29,19 +29,19 @@ class SequenceToDistogram(Base):
         self.transformer = transformers.RobertaModel(config=config)
 
         self.mlp = nn.Sequential(
-            nn.Linear(4 * self.hidden_size, 512),
+            nn.Linear(4 * self.hidden_size, 128),
             nn.ReLU(),
-            nn.Linear(512, 128),
+            nn.Linear(128, 128),
             nn.ReLU(),
             nn.Linear(128, 1),
             nn.ReLU())
 
         self.conv_layers = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=5, padding="same"),
+            nn.Conv2d(in_channels=1, out_channels=4, kernel_size=5, padding="same"),
             nn.ReLU(),
-            nn.Conv2d(in_channels=8, out_channels=8, kernel_size=5, padding="same"),
+            nn.Conv2d(in_channels=4, out_channels=4, kernel_size=5, padding="same"),
             nn.ReLU(),
-            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=5, padding="same"),
+            nn.Conv2d(in_channels=4, out_channels=1, kernel_size=5, padding="same"),
             nn.ReLU()
         )
 

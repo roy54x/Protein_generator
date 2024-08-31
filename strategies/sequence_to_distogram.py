@@ -1,13 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 import transformers
 
-from constants import AMINO_ACIDS, MAX_TRAINING_SIZE, DECAY_RATE, BATCH_SIZE
+from constants import AMINO_ACIDS, MAX_TRAINING_SIZE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence, padd_contact_map
-from utils.structure_utils import get_soft_contact_map, get_distogram
+from utils.structure_utils import get_distogram
 from utils.utils import normalize
 
 
@@ -16,24 +15,24 @@ class SequenceToDistogram(Base):
     def __init__(self):
         super(SequenceToDistogram, self).__init__()
 
-        self.hidden_size = 360
+        self.hidden_size = 64
 
         config = transformers.RobertaConfig(
             vocab_size=len(AMINO_ACIDS) + 1,
             max_position_embeddings=MAX_TRAINING_SIZE + 2,
             hidden_size=self.hidden_size,
-            num_attention_heads=6,
-            num_hidden_layers=6,
+            num_attention_heads=4,
+            num_hidden_layers=4,
             type_vocab_size=1
         )
         self.transformer = transformers.RobertaModel(config=config)
 
         self.mlp = nn.Sequential(
-            nn.Linear(4 * self.hidden_size + 1, 128),
+            nn.Linear(4 * self.hidden_size + 1, 64),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(128, 1),
+            nn.Linear(64, 1),
             nn.ReLU())
 
     def load_inputs_and_ground_truth(self, data, normalize_distogram=True):

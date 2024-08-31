@@ -7,7 +7,7 @@ from utils.structure_utils import optimize_points_from_distogram, align_points, 
     plot_contact_map
 
 strategy = SequenceToDistogram()
-model_path = r"D:\python project\data\Proteins\models\SequenceToDistogram\20240831\best_model.pth"
+model_path = r"C:\Users\RoyIlani\Desktop\proteins\models\SequenceToDistogram\20240831\best_model.pth"
 state_dict = torch.load(model_path)
 strategy.load_state_dict(state_dict)
 strategy.eval()

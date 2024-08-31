@@ -51,7 +51,7 @@ def get_distogram_from_soft_contact_map(contact_map, decay_rate=0.5):
     return distances
 
 
-def optimize_points_from_distogram(distogram, n_init=4, max_iter=300, random_state=None):
+def optimize_points_from_distogram(distogram, n_init=1000, max_iter=30000, random_state=None):
     mds = MDS(n_components=3, dissimilarity="precomputed", n_init=n_init, max_iter=max_iter, random_state=random_state)
     points = mds.fit_transform(distogram)
     return points

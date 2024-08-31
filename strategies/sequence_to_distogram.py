@@ -16,7 +16,7 @@ class SequenceToDistogram(Base):
     def __init__(self):
         super(SequenceToDistogram, self).__init__()
 
-        self.hidden_size = 36
+        self.hidden_size = 480
 
         config = transformers.RobertaConfig(
             vocab_size=len(AMINO_ACIDS) + 1,

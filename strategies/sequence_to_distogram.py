@@ -57,13 +57,21 @@ class SequenceToDistogram(Base):
 
         return (x_tensor, mask_tensor), ground_truth
 
-    def get_outputs(self, x, mask):
+    def forward(self, input):
+        x, mask = input
+
         # x is of shape (batch_size, max_tokens, 1)
         x = self.transformer(x, attention_mask=mask).last_hidden_state  # Shape: (batch_size, max_tokens, hidden_size)
 
         batch_size, max_tokens, hidden_size = x.size()
         x = x.view(batch_size * max_tokens, hidden_size)
-        coords_3d = self.project_to_3d(x)
+
+        x_i = x.unsqueeze(2)  # Shape: (batch_size, max_tokens, 1, hidden_size)
+        x_i_expanded = x_i.expand(batch_size, max_tokens, max_tokens,
+                                  hidden_size)  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)
+        x_j = x.unsqueeze(1)  # Shape: (batch_size, 1, max_tokens, hidden_size)
+        x_j_expanded = x_j.expand(batch_size, max_tokens, max_tokens,
+                                  hidden_size)  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)
 
         difference = x_i - x_j  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)
         multiplication = x_i * x_j  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)

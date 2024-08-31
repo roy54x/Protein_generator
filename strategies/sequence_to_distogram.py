@@ -28,12 +28,6 @@ class SequenceToDistogram(Base):
         )
         self.transformer = transformers.RobertaModel(config=config)
 
-        i_indices = (torch.arange(MAX_TRAINING_SIZE).view(1, MAX_TRAINING_SIZE, 1)
-                     .expand(BATCH_SIZE, MAX_TRAINING_SIZE, MAX_TRAINING_SIZE))
-        j_indices = (torch.arange(MAX_TRAINING_SIZE).view(1, 1, MAX_TRAINING_SIZE)
-                     .expand(BATCH_SIZE, MAX_TRAINING_SIZE, MAX_TRAINING_SIZE))
-        self.index_diff = (i_indices - j_indices).unsqueeze(-1).float().to(device=self.device)
-
         self.mlp = nn.Sequential(
             nn.Linear(4 * self.hidden_size + 1, 128),
             nn.ReLU(),
@@ -80,7 +74,13 @@ class SequenceToDistogram(Base):
         difference = x_i - x_j  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)
         multiplication = x_i * x_j  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)
 
-        concatenated = torch.cat((x_i_expanded, x_j_expanded, difference, multiplication, self.index_diff),
+        i_indices = (torch.arange(max_tokens).view(1, max_tokens, 1)
+                     .expand(batch_size, max_tokens, max_tokens))
+        j_indices = (torch.arange(max_tokens).view(1, 1, max_tokens)
+                     .expand(batch_size, max_tokens, max_tokens))
+        index_diff = (i_indices - j_indices).unsqueeze(-1).float().to(device=self.device) # Shape: (batch_size, max_tokens, max_tokens, 1)
+
+        concatenated = torch.cat((x_i_expanded, x_j_expanded, difference, multiplication, index_diff),
                                  dim=-1)  # Shape: (batch_size, max_tokens, max_tokens, 4 * hidden_size)
         concatenated = concatenated.view(batch_size * max_tokens * max_tokens, -1)
         out = self.mlp(concatenated)  # Shape: (batch_size * max_tokens * max_tokens, 1)

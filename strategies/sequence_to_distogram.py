@@ -64,8 +64,6 @@ class SequenceToDistogram(Base):
         x = self.transformer(x, attention_mask=mask).last_hidden_state  # Shape: (batch_size, max_tokens, hidden_size)
 
         batch_size, max_tokens, hidden_size = x.size()
-        x = x.view(batch_size * max_tokens, hidden_size)
-
         x_i = x.unsqueeze(2)  # Shape: (batch_size, max_tokens, 1, hidden_size)
         x_i_expanded = x_i.expand(batch_size, max_tokens, max_tokens,
                                   hidden_size)  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)

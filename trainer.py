@@ -7,7 +7,7 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
-from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME
+from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME, BATCH_SIZE
 from strategies.sequence_to_distogram import SequenceToDistogram
 
 
@@ -124,7 +124,7 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    data_path = os.path.join(MAIN_DIR,"PDB\pdb_data_130000")
+    data_path = os.path.join(MAIN_DIR,"pdb_data_130000")
     strategy = SequenceToDistogram()
-    trainer = Trainer(data_path, strategy, batch_size=16, test_size=0.15)
+    trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, test_size=0.15)
     trainer.train()

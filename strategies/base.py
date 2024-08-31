@@ -5,7 +5,8 @@ from constants import MIN_SIZE, MAX_TRAINING_SIZE
 
 
 class Base(nn.Module):
-    def __init__(self):
+    def __init__(self, device="cuda:0"):
+        self.device = device
         super(Base, self).__init__()
 
     @staticmethod

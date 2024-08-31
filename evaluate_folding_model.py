@@ -1,13 +1,10 @@
+import numpy as np
 import pandas as pd
 import torch
-import json
-import matplotlib.pyplot as plt
-import numpy as np
 
 from strategies.sequence_to_distogram import SequenceToDistogram
 from utils.structure_utils import optimize_points_from_distogram, align_points, plot_protein_atoms, \
-    get_distogram_from_soft_contact_map, plot_contact_map
-from utils.utils import normalize
+    plot_contact_map
 
 strategy = SequenceToDistogram()
 model_path = r"D:\python project\data\Proteins\models\SequenceToDistogram\20240831\best_model.pth"

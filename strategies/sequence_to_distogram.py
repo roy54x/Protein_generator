@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import transformers
 
-from constants import AMINO_ACIDS, MAX_TRAINING_SIZE, DECAY_RATE
+from constants import AMINO_ACIDS, MAX_TRAINING_SIZE, DECAY_RATE, BATCH_SIZE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence, padd_contact_map
 from utils.structure_utils import get_soft_contact_map, get_distogram
@@ -16,7 +16,7 @@ class SequenceToDistogram(Base):
     def __init__(self):
         super(SequenceToDistogram, self).__init__()
 
-        self.hidden_size = 18
+        self.hidden_size = 360
 
         config = transformers.RobertaConfig(
             vocab_size=len(AMINO_ACIDS) + 1,
@@ -28,22 +28,19 @@ class SequenceToDistogram(Base):
         )
         self.transformer = transformers.RobertaModel(config=config)
 
+        i_indices = (torch.arange(MAX_TRAINING_SIZE).view(1, MAX_TRAINING_SIZE, 1)
+                     .expand(BATCH_SIZE, MAX_TRAINING_SIZE, MAX_TRAINING_SIZE))
+        j_indices = (torch.arange(MAX_TRAINING_SIZE).view(1, 1, MAX_TRAINING_SIZE)
+                     .expand(BATCH_SIZE, MAX_TRAINING_SIZE, MAX_TRAINING_SIZE))
+        self.index_diff = (i_indices - j_indices).unsqueeze(-1).float().to(device=self.device)
+
         self.mlp = nn.Sequential(
-            nn.Linear(4 * self.hidden_size, 512),
+            nn.Linear(4 * self.hidden_size + 1, 128),
             nn.ReLU(),
-            nn.Linear(512, 128),
+            nn.Linear(128, 128),
             nn.ReLU(),
             nn.Linear(128, 1),
             nn.ReLU())
-
-        self.conv_layers = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=5, padding="same"),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=8, out_channels=8, kernel_size=5, padding="same"),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=8, out_channels=1, kernel_size=5, padding="same"),
-            nn.ReLU()
-        )
 
     def load_inputs_and_ground_truth(self, data, normalize_distogram=True):
         sequence = data['sequence']
@@ -82,13 +79,11 @@ class SequenceToDistogram(Base):
 
         difference = x_i - x_j  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)
         multiplication = x_i * x_j  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)
-        concatenated = torch.cat((x_i_expanded, x_j_expanded, difference, multiplication),
+
+        concatenated = torch.cat((x_i_expanded, x_j_expanded, difference, multiplication, self.index_diff),
                                  dim=-1)  # Shape: (batch_size, max_tokens, max_tokens, 4 * hidden_size)
         concatenated = concatenated.view(batch_size * max_tokens * max_tokens, -1)
         out = self.mlp(concatenated)  # Shape: (batch_size * max_tokens * max_tokens, 1)
-
-        out = out.view(batch_size, 1, max_tokens, max_tokens)
-        #out = self.conv_layers(out)  # Shape: (batch_size, 1, max_tokens, max_tokens)
 
         out = out.view(batch_size, -1)
         max_values, _ = torch.max(out, dim=-1, keepdim=True)

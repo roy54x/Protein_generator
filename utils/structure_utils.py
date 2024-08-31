@@ -7,16 +7,18 @@ from matplotlib import pyplot as plt
 from sklearn.manifold import MDS
 
 from constants import MAIN_DIR, MAX_SIZE
+from utils.utils import normalize
 
 
 def get_distogram(ca_coords):
     if len(ca_coords) <= 1 or len(ca_coords) > MAX_SIZE:
         return None
 
-    ca_coords = np.array(ca_coords, dtype="float16")
+    ca_coords = np.array(ca_coords, dtype="float32")
     diff = ca_coords[:, np.newaxis, :] - ca_coords[np.newaxis, :, :]
-    distances = np.linalg.norm(diff, axis=-1)
-    return distances
+    distogram = np.linalg.norm(diff, axis=-1)
+
+    return distogram
 
 
 def get_contact_map(ca_coords, threshold=8.0):
@@ -28,7 +30,7 @@ def get_contact_map(ca_coords, threshold=8.0):
 def get_soft_contact_map(ca_coords, decay_rate=0.5):
     distances = get_distogram(ca_coords)
     if distances is not None:
-        return np.exp(-decay_rate * distances).astype("float16")
+        return np.exp(-decay_rate * distances)
 
 
 def plot_contact_map(predicted_distogram, ground_truth_distogram):
@@ -43,11 +45,10 @@ def plot_contact_map(predicted_distogram, ground_truth_distogram):
     plt.show()
 
 
-
 def get_distogram_from_soft_contact_map(contact_map, decay_rate=0.5):
     distances = -np.log(contact_map) / decay_rate
     distances = (distances + distances.T) / 2
-    return distances.astype("float16")
+    return distances
 
 
 def optimize_points_from_distogram(distogram, n_init=4, max_iter=300, random_state=None):
@@ -87,13 +88,13 @@ def plot_protein_atoms(predicted_points, ground_truth_points, title="Protein 3D 
 
     # Plot and connect Ground Truth Points in sequence
     ax.plot(ground_truth_points[:, 0], ground_truth_points[:, 1], ground_truth_points[:, 2],
-            color='deepskyblue', label='Ground Truth', marker='o', markersize=10, alpha=0.9,
-            linestyle='-', linewidth=2, markerfacecolor='yellow', markeredgewidth=2, markeredgecolor='black')
+            color='deepskyblue', label='Ground Truth', marker='o', markersize=5, alpha=0.5,
+            linestyle='-', linewidth=5, markerfacecolor='yellow', markeredgewidth=2, markeredgecolor='black')
 
     # Plot and connect Predicted Points in sequence
     ax.plot(predicted_points[:, 0], predicted_points[:, 1], predicted_points[:, 2],
-            color='tomato', label='Predicted', marker='o', markersize=10, alpha=0.9,
-            linestyle='-', linewidth=2, markerfacecolor='yellow', markeredgewidth=2, markeredgecolor='black')
+            color='tomato', label='Predicted', marker='o', markersize=5, alpha=0.5,
+            linestyle='-', linewidth=5, markerfacecolor='yellow', markeredgewidth=2, markeredgecolor='black')
 
     # Labels and Title with a fun font
     ax.set_xlabel('X', fontsize=14, fontweight='bold', color='black')

@@ -36,7 +36,7 @@ class SequenceToDistogram(Base):
             nn.Conv2d(in_channels=8, out_channels=1, kernel_size=5, padding="same")
         )
 
-    def load_inputs_and_ground_truth(self, data):
+    def load_inputs_and_ground_truth(self, data, normalize_distogram=True):
         sequence = data['sequence']
 
         if self.training:
@@ -51,7 +51,8 @@ class SequenceToDistogram(Base):
         # Get ground truth
         distogram = get_distogram(data["coords"])
         distogram = distogram[start: end, start: end]
-        distogram = normalize(distogram)
+        if normalize_distogram:
+            distogram = normalize(distogram)
         ground_truth = padd_contact_map(distogram, MAX_TRAINING_SIZE)
 
         return (x_tensor, mask_tensor), ground_truth

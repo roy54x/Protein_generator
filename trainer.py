@@ -1,5 +1,6 @@
 import os
 import time
+import warnings
 from datetime import datetime
 
 import pandas as pd
@@ -26,9 +27,17 @@ class CustomDataset(Dataset):
 
 
 class Trainer:
-    def __init__(self, directory, strategy, batch_size=32, test_size=0.2, device="cuda:0"):
+    def __init__(self, directory, strategy, batch_size=32, test_size=0.2, device="cuda:0", pretrained_model_path=""):
         self.directory = directory
         self.strategy = strategy.to(device)
+        self.pretrained_model_path = pretrained_model_path
+        if os.path.exists(self.pretrained_model_path):
+            model = torch.load(pretrained_model_path)
+            self.strategy.load_state_dict(model)
+        else:
+            warnings.warn("Pretrained model path does not exist. Skipping")
+            self.pretrained_model_path = None
+
         self.batch_size = batch_size
         self.test_size = test_size
         self.device = device
@@ -111,14 +120,16 @@ class Trainer:
                 self.save_model()
 
     def save_model(self):
-        # Create the directory name from strategy and date
-        directory = os.path.join(MAIN_DIR, "models", self.strategy.__class__.__name__,
+        if self.pretrained_model_path:
+            directory = os.path.dirname(self.pretrained_model_path)
+            model_path = os.path.join(directory, 'pretrained.pth')
+        else:
+            directory = os.path.join(MAIN_DIR, "models", self.strategy.__class__.__name__,
                                  datetime.now().strftime("%Y%m%d"))
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            model_path = os.path.join(directory, 'best_model.pth')
 
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-
-        model_path = os.path.join(directory, 'best_model.pth')
         torch.save(self.strategy.state_dict(), model_path)
         print(f'Model saved at {model_path}')
 

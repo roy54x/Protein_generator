@@ -77,7 +77,7 @@ class SequenceToDistogram(Base):
                      .expand(batch_size, max_tokens, max_tokens))
         j_indices = (torch.arange(max_tokens).view(1, 1, max_tokens)
                      .expand(batch_size, max_tokens, max_tokens))
-        index_diff = (i_indices - j_indices).unsqueeze(-1).float().to(device=self.device) # Shape: (batch_size, max_tokens, max_tokens, 1)
+        index_diff = (i_indices - j_indices).unsqueeze(-1).float().to(device=x.device) # Shape: (batch_size, max_tokens, max_tokens, 1)
 
         concatenated = torch.cat((x_i_expanded, x_j_expanded, difference, multiplication, index_diff),
                                  dim=-1)  # Shape: (batch_size, max_tokens, max_tokens, 4 * hidden_size)

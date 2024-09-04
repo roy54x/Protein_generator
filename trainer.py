@@ -75,26 +75,26 @@ class Trainer:
                 train_loader = self.get_dataloader(train_file, mode="train")
 
                 for inputs, ground_truth in train_loader:
-                        self.optimizer.zero_grad()
-                        outputs = self.strategy((x.to(self.device) for x in inputs))
-                        loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
-                        loss.backward()
-                        self.optimizer.step()
+                    self.optimizer.zero_grad()
+                    outputs = self.strategy((x.to(self.device) for x in inputs))
+                    loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
+                    loss.backward()
+                    self.optimizer.step()
 
-                        total_train_loss += loss.item()
-                        total_train_samples += len(inputs)
-                        batch_count += 1
+                    total_train_loss += loss.item()
+                    total_train_samples += len(inputs)
+                    batch_count += 1
 
-                        # Print every 100 batches
-                        if batch_count % 100 == 0:
-                            avg_train_loss = total_train_loss / total_train_samples
-                            elapsed_time = time.time() - start_time
-                            print(f'Epoch {epoch + 1}, Batch {batch_count} of {self.train_size//self.batch_size}, '
-                                  f'Training Loss: {avg_train_loss:.4f}, '
-                                  f'Time taken: {elapsed_time:.4f} seconds.')
-                            total_train_loss = 0
-                            total_train_samples = 0
-                            start_time = time.time()
+                    # Print every 100 batches
+                    if batch_count % 100 == 0:
+                        avg_train_loss = total_train_loss / total_train_samples
+                        elapsed_time = time.time() - start_time
+                        print(f'Epoch {epoch + 1}, Batch {batch_count} of {self.train_size // self.batch_size}, '
+                              f'Training Loss: {avg_train_loss:.4f}, '
+                              f'Time taken: {elapsed_time:.4f} seconds.')
+                        total_train_loss = 0
+                        total_train_samples = 0
+                        start_time = time.time()
 
             # Evaluate on test data
             self.strategy.eval()
@@ -125,7 +125,7 @@ class Trainer:
             model_path = os.path.join(directory, 'pretrained.pth')
         else:
             directory = os.path.join(MAIN_DIR, "models", self.strategy.__class__.__name__,
-                                 datetime.now().strftime("%Y%m%d"))
+                                     datetime.now().strftime("%Y%m%d"))
             if not os.path.exists(directory):
                 os.makedirs(directory)
             model_path = os.path.join(directory, 'best_model.pth')
@@ -135,7 +135,8 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    data_path = os.path.join(MAIN_DIR,"pdb_data_130000")
+    data_path = os.path.join(MAIN_DIR, "pdb_data_130000")
     strategy = SequenceToDistogram()
-    trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, test_size=0.15)
+    trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, test_size=0.15,
+                      pretrained_model_path=r"C:\Users\RoyIlani\Desktop\proteins\models\SequenceToDistogram\20240901\pretrained_4.pth")
     trainer.train()

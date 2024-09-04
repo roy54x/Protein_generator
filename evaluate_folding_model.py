@@ -7,12 +7,12 @@ from utils.structure_utils import optimize_points_from_distogram, align_points, 
     plot_contact_map
 
 strategy = SequenceToDistogram()
-model_path = r"C:\Users\RoyIlani\Desktop\proteins\models\SequenceToDistogram\20240831\best_model.pth"
+model_path = r"C:\Users\RoyIlani\Desktop\proteins\models\SequenceToDistogram\20240901\pretrained_4.pth"
 state_dict = torch.load(model_path)
 strategy.load_state_dict(state_dict)
 strategy.eval()
 
-data_path = "D:\python project\data\Proteins\PDB\pdb_data_130000\pdb_df_9.json"
+data_path = r"C:\Users\RoyIlani\Desktop\proteins\pdb_data_130000\pdb_df_9.json"
 pdb_df = pd.read_json(data_path, lines=True)
 pdb_id = "6VMH"
 chain_id = "B"

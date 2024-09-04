@@ -56,6 +56,15 @@ class SequenceToDistogram(Base):
 
         return (x_tensor, mask_tensor), ground_truth
 
+    def get_indices_difference(self, x, batch_size, max_tokens):
+        i_indices = (torch.arange(max_tokens).view(1, max_tokens, 1)
+                     .expand(batch_size, max_tokens, max_tokens))
+        j_indices = (torch.arange(max_tokens).view(1, 1, max_tokens)
+                     .expand(batch_size, max_tokens, max_tokens))
+        index_diff = (i_indices - j_indices).unsqueeze(-1).abs().float().to(
+            device=x.device)  # Shape: (batch_size, max_tokens, max_tokens, 1)
+        return index_diff
+
     def forward(self, input):
         x, mask = input
 
@@ -73,11 +82,7 @@ class SequenceToDistogram(Base):
         difference = x_i - x_j  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)
         multiplication = x_i * x_j  # Shape: (batch_size, max_tokens, max_tokens, hidden_size)
 
-        i_indices = (torch.arange(max_tokens).view(1, max_tokens, 1)
-                     .expand(batch_size, max_tokens, max_tokens))
-        j_indices = (torch.arange(max_tokens).view(1, 1, max_tokens)
-                     .expand(batch_size, max_tokens, max_tokens))
-        index_diff = (i_indices - j_indices).unsqueeze(-1).float().to(device=x.device) # Shape: (batch_size, max_tokens, max_tokens, 1)
+        index_diff = self.get_indices_difference(x, batch_size, max_tokens)
 
         concatenated = torch.cat((x_i_expanded, x_j_expanded, difference, multiplication, index_diff),
                                  dim=-1)  # Shape: (batch_size, max_tokens, max_tokens, 4 * hidden_size)
@@ -90,11 +95,26 @@ class SequenceToDistogram(Base):
         out = out.view(batch_size, max_tokens, max_tokens)
         return out, mask
 
+
     def compute_loss(self, outputs, ground_truth):
         prediction, mask = outputs
-        mask = mask.unsqueeze(1) * mask.unsqueeze(2)  # Shape: (batch_size, max_size, max_size)
-        l1_loss = F.l1_loss(prediction * mask, ground_truth * mask, reduction='sum')
-        num_valid_elements = mask.sum()
-        if num_valid_elements > 0:
-            l1_loss /= num_valid_elements
-        return l1_loss
+        batch_size, max_tokens, _ = prediction.shape
+        mask = mask.unsqueeze(1) * mask.unsqueeze(2)  # Shape: (batch_size, max_tokens, max_tokens)
+        index_diff = self.get_indices_difference(prediction, batch_size, max_tokens)
+
+        # Compute the L1 loss for each sample individually and multiply by the absolute index difference
+        l1_loss_per_sample = F.l1_loss(prediction * mask, ground_truth * mask, reduction='none')
+        l1_loss_per_sample *= index_diff  # Shape: (batch_size, max_tokens, max_tokens, 1)
+
+        # Sum the loss over the max_size dimensions
+        l1_loss_per_sample = l1_loss_per_sample.sum(dim=[1, 2])
+
+        # Calculate the number of valid elements per sample
+        num_valid_elements_per_sample = mask.sum(dim=[1, 2])
+        valid_mask = num_valid_elements_per_sample > 0
+        l1_loss_per_sample[valid_mask] /= num_valid_elements_per_sample[valid_mask]
+
+        # Average the loss over the batch
+        average_loss = l1_loss_per_sample.mean()
+
+        return average_loss

@@ -89,10 +89,14 @@ class SequenceToDistogram(Base):
         concatenated = concatenated.view(batch_size * max_tokens * max_tokens, -1)
         out = self.mlp(concatenated)  # Shape: (batch_size * max_tokens * max_tokens, 1)
 
-        out = out.view(batch_size, -1)
-        max_values, _ = torch.max(out, dim=-1, keepdim=True)
-        out = out / max_values
+        # Zero the diagonal and normalize
         out = out.view(batch_size, max_tokens, max_tokens)
+        diagonal_mask = (torch.ones(max_tokens, max_tokens, device=out.device)
+                         - torch.eye(max_tokens, device=out.device))
+        out = out * diagonal_mask.unsqueeze(0)  # Shape: (batch_size, max_tokens, max_tokens)
+        max_values, _ = torch.max(out.view(batch_size, -1), dim=-1, keepdim=True)
+        out = out / max_values.view(batch_size, 1, 1)
+
         return out, mask
 
 

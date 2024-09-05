@@ -99,26 +99,23 @@ class SequenceToDistogram(Base):
 
         return out, mask
 
-
     def compute_loss(self, outputs, ground_truth):
         prediction, mask = outputs
         batch_size, max_tokens, _ = prediction.shape
         mask = mask.unsqueeze(1) * mask.unsqueeze(2)  # Shape: (batch_size, max_tokens, max_tokens)
-        index_diff = self.get_indices_difference(prediction, batch_size, max_tokens)
+        index_diff = self.get_indices_difference(prediction, batch_size, max_tokens) * mask
 
         # Compute the L1 loss for each sample individually and multiply by the absolute index difference
-        l1_loss_per_sample = F.l1_loss(prediction * mask, ground_truth * mask, reduction='none')
+        l1_loss_per_sample = F.l1_loss(prediction, ground_truth, reduction='none')
         l1_loss_per_sample *= index_diff  # Shape: (batch_size, max_tokens, max_tokens)
 
         # Sum the loss over the max_size dimensions
-        l1_loss_per_sample = l1_loss_per_sample.sum(dim=[1, 2])
-
-        # Calculate the number of valid elements per sample
-        num_valid_elements_per_sample = mask.sum(dim=[1, 2])
-        valid_mask = num_valid_elements_per_sample > 0
-        l1_loss_per_sample[valid_mask] /= num_valid_elements_per_sample[valid_mask]
+        l1_loss_per_sample = l1_loss_per_sample.sum(dim=[1, 2])  # Shape: batch_size
+        elements_per_sample = index_diff.sum(dim=[1, 2])
+        valid_mask = elements_per_sample > 0
+        l1_loss_per_sample[valid_mask] /= elements_per_sample[valid_mask]
 
         # Average the loss over the batch
-        average_loss = l1_loss_per_sample.mean()
+        average_loss = l1_loss_per_sample.mean()  # Shape: 1
 
         return average_loss

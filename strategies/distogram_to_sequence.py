@@ -21,10 +21,11 @@ class DistogramToSequence(Base):
         self.num_layers = 4
         self.num_heads = 16
         self.attention_layers = nn.ModuleList([
-            nn.MultiheadAttention(embed_dim=self.hidden_size, num_heads=self.num_heads)
+            nn.MultiheadAttention(embed_dim=self.hidden_size, num_heads=self.num_heads, batch_first=True)
             for _ in range(self.num_layers)
         ])
-        self.linear = nn.Linear(self.hidden_size, self.vocab_size)
+        self.linear1 = nn.Linear(self.hidden_size * 3, self.hidden_size)
+        self.linear2 = nn.Linear(self.hidden_size, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, data, normalize_distogram=True):
         sequence = data['sequence']
@@ -36,7 +37,8 @@ class DistogramToSequence(Base):
         sequence_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
         # Get ground truth
-        ground_truth = copy.deepcopy(sequence_tensor[len(sequence) - 1])
+        ground_truth = copy.deepcopy(sequence_tensor[len(sequence) - 1]).to(torch.long)
+        ground_truth = F.one_hot(ground_truth, num_classes=21).float()
 
         # Get inputs
         sequence_tensor[len(sequence) - 1] = 0
@@ -54,20 +56,23 @@ class DistogramToSequence(Base):
         input_size = x.shape
         weights = (1 - distances) * mask_tensor
 
-        x, weights, mask_tensor = x.transpose(0, 1), weights.transpose(0, 1), mask_tensor.transpose(0, 1)
-        mask_tensor = mask_tensor.to(bool)
+        x, weights = x.unsqueeze(-1).expand(-1, -1, self.hidden_size), weights.unsqueeze(-1).expand(-1, -1, self.hidden_size)
+
+        x = x.to(torch.float32)
+        mask_tensor = ~mask_tensor.to(bool)
 
         for layer_idx, attention in enumerate(self.attention_layers):
-            x, _ = attention(weights, x, x, attn_mask=mask_tensor)
-            if layer_idx == 0:
-                weights = weights.unsqueeze(-1).expand(-1, -1, self.hidden_size)  # Shape: (batch_size, seq_len, hidden_size)
+            x, _ = attention(weights, x, x, key_padding_mask=mask_tensor)
 
-        x = x.transpose(0, 1)  # Shape: (batch_size, seq_len, hidden_size)
+        pooled_output_mean = x.mean(dim=1)  # Shape: (batch_size, hidden_size)
+        pooled_output_max, _ = x.max(dim=1)
+        pooled_output_min, _ = x.min(dim=1)
 
-        logits = self.linear(x.view(-1, self.hidden_size))  # Shape: (batch_size * seq_len, vocab_size)
-        logits = logits.view(-1, input_size[1], self.vocab_size)  # Shape: (batch_size, seq_len, vocab_size)
-        pooled_logits = logits.sum(dim=1)  # Shape: (batch_size, vocab_size)
-        probabilities = F.softmax(pooled_logits, dim=-1)  # Shape: (batch_size, vocab_size)
+        concatenated_output = torch.cat((pooled_output_mean, pooled_output_max, pooled_output_min), dim=-1)
+        output = self.linear1(concatenated_output)
+        output = F.relu(output)
+        output = self.linear2(output)
+        probabilities = F.softmax(output, dim=-1)
 
         return probabilities  # Shape: (batch_size, vocab_size)
 

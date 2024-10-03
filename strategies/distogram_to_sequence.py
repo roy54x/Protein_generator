@@ -38,7 +38,7 @@ class DistogramToSequence(Base):
 
         # Get ground truth
         ground_truth = copy.deepcopy(sequence_tensor[len(sequence) - 1]).to(torch.long)
-        ground_truth = F.one_hot(ground_truth, num_classes=21).float()
+        ground_truth = F.one_hot(ground_truth, num_classes=self.vocab_size).float()
 
         # Get inputs
         sequence_tensor[len(sequence) - 1] = 0
@@ -53,7 +53,6 @@ class DistogramToSequence(Base):
 
     def forward(self, inputs):
         x, distances, mask_tensor = inputs
-        input_size = x.shape
         weights = (1 - distances) * mask_tensor
 
         x, weights = x.unsqueeze(-1).expand(-1, -1, self.hidden_size), weights.unsqueeze(-1).expand(-1, -1, self.hidden_size)

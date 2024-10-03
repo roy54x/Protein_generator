@@ -50,19 +50,21 @@ class DistogramToSequence(Base):
         return (sequence_tensor, distances, mask_tensor), ground_truth
 
     def forward(self, inputs):
-        input_tensor, distances, mask_tensor = inputs
+        x, distances, mask_tensor = inputs
+        input_size = x.shape
         weights = (1 - distances) * mask_tensor
+
+        x, weights, mask_tensor = x.transpose(0, 1), weights.transpose(0, 1), mask_tensor.transpose(0, 1)
         mask_tensor = mask_tensor.to(bool)
 
-        output = input_tensor.transpose(0, 1)  # Shape: (seq_len, batch_size, hidden_size)
-        weights = weights.unsqueeze(-1).expand(-1, -1, self.hidden_size)  # Shape: (batch_size, seq_len, hidden_size)
-        weights = weights.transpose(0, 1)  # Shape: (seq_len, batch_size, hidden_size)
-        for attention in self.attention_layers:
-            output, _ = attention(weights, output, output, key_padding_mask=mask_tensor)  # Attention layers
-        output = output.transpose(0, 1)  # Shape: (batch_size, seq_len, hidden_size)
+        for layer_idx, attention in enumerate(self.attention_layers):
+            if layer_idx != 0:
+                weights = weights.unsqueeze(-1).expand(-1, -1, self.hidden_size)  # Shape: (batch_size, seq_len, hidden_size)
+            x, _ = attention(weights, x, x, key_padding_mask=mask_tensor)  # Attention layers
+        x = x.transpose(0, 1)  # Shape: (batch_size, seq_len, hidden_size)
 
-        logits = self.linear(output.view(-1, self.hidden_size))  # Shape: (batch_size * seq_len, vocab_size)
-        logits = logits.view(-1, input_tensor.size(1), self.vocab_size)  # Shape: (batch_size, seq_len, vocab_size)
+        logits = self.linear(x.view(-1, self.hidden_size))  # Shape: (batch_size * seq_len, vocab_size)
+        logits = logits.view(-1, input_size[1], self.vocab_size)  # Shape: (batch_size, seq_len, vocab_size)
         pooled_logits = logits.sum(dim=1)  # Shape: (batch_size, vocab_size)
         probabilities = F.softmax(pooled_logits, dim=-1)  # Shape: (batch_size, vocab_size)
 

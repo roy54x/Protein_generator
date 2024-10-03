@@ -17,15 +17,14 @@ class DistogramToSequence(Base):
     def __init__(self):
         super(DistogramToSequence, self).__init__()
         self.vocab_size = len(AMINO_ACIDS) + 1
-        self.hidden_size = 256
-        self.num_layers = 4
-        self.num_heads = 16
+        self.hidden_size = 360
+        self.num_layers = 6
+        self.num_heads = 6
         self.attention_layers = nn.ModuleList([
             nn.MultiheadAttention(embed_dim=self.hidden_size, num_heads=self.num_heads, batch_first=True)
             for _ in range(self.num_layers)
         ])
-        self.linear1 = nn.Linear(self.hidden_size * 3, self.hidden_size)
-        self.linear2 = nn.Linear(self.hidden_size, self.vocab_size)
+        self.linear = nn.Linear(self.hidden_size, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, data, normalize_distogram=True):
         sequence = data['sequence']
@@ -54,24 +53,18 @@ class DistogramToSequence(Base):
     def forward(self, inputs):
         x, distances, mask_tensor = inputs
         weights = (1 - distances) * mask_tensor
+        last_indices = mask_tensor.argmin(dim=1)
 
         x, weights = x.unsqueeze(-1).expand(-1, -1, self.hidden_size), weights.unsqueeze(-1).expand(-1, -1, self.hidden_size)
-
         x = x.to(torch.float32)
         mask_tensor = ~mask_tensor.to(bool)
 
         for layer_idx, attention in enumerate(self.attention_layers):
             x, _ = attention(weights, x, x, key_padding_mask=mask_tensor)
 
-        pooled_output_mean = x.mean(dim=1)  # Shape: (batch_size, hidden_size)
-        pooled_output_max, _ = x.max(dim=1)
-        pooled_output_min, _ = x.min(dim=1)
-
-        concatenated_output = torch.cat((pooled_output_mean, pooled_output_max, pooled_output_min), dim=-1)
-        output = self.linear1(concatenated_output)
-        output = F.relu(output)
-        output = self.linear2(output)
-        probabilities = F.softmax(output, dim=-1)
+        x = x[torch.arange(x.size(0)), last_indices]
+        x = self.linear(x)
+        probabilities = F.softmax(x, dim=-1)
 
         return probabilities  # Shape: (batch_size, vocab_size)
 

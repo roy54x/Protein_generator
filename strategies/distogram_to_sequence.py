@@ -17,9 +17,9 @@ class DistogramToSequence(Base):
     def __init__(self):
         super(DistogramToSequence, self).__init__()
         self.vocab_size = len(AMINO_ACIDS) + 1
-        self.hidden_size = 8
+        self.hidden_size = 256
         self.num_layers = 4
-        self.num_heads = 8
+        self.num_heads = 16
         self.attention_layers = nn.ModuleList([
             nn.MultiheadAttention(embed_dim=self.hidden_size, num_heads=self.num_heads)
             for _ in range(self.num_layers)
@@ -58,9 +58,10 @@ class DistogramToSequence(Base):
         mask_tensor = mask_tensor.to(bool)
 
         for layer_idx, attention in enumerate(self.attention_layers):
-            if layer_idx != 0:
+            x, _ = attention(weights, x, x, attn_mask=mask_tensor)
+            if layer_idx == 0:
                 weights = weights.unsqueeze(-1).expand(-1, -1, self.hidden_size)  # Shape: (batch_size, seq_len, hidden_size)
-            x, _ = attention(weights, x, x, key_padding_mask=mask_tensor)  # Attention layers
+
         x = x.transpose(0, 1)  # Shape: (batch_size, seq_len, hidden_size)
 
         logits = self.linear(x.view(-1, self.hidden_size))  # Shape: (batch_size * seq_len, vocab_size)

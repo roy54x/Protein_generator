@@ -82,7 +82,7 @@ class Trainer:
                     self.optimizer.step()
 
                     total_train_loss += loss.item()
-                    total_train_samples += len(inputs)
+                    total_train_samples += len(inputs[0])
                     batch_count += 1
 
                     # Print every 100 batches
@@ -109,7 +109,7 @@ class Trainer:
                         outputs = self.strategy((x.to(self.device) for x in inputs))
                         loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
                         total_test_loss += loss.item()
-                        total_test_samples += len(inputs)
+                        total_test_samples += len(inputs[0])
 
             average_test_loss = total_test_loss / total_test_samples
             print(f'Epoch {epoch + 1}, Test Loss: {average_test_loss:.4f}')

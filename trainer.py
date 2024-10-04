@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
 from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME, BATCH_SIZE
+from strategies.contact_map_to_sequence import ContactMapToSequence
 from strategies.sequence_to_distogram import SequenceToDistogram
 
 
@@ -24,6 +25,9 @@ class CustomDataset(Dataset):
         row = self.dataframe.iloc[idx]
         inputs, ground_truth = self.strategy.load_inputs_and_ground_truth(row)
         return inputs, ground_truth
+
+    def collate_fn(self, batch):
+        return self.strategy.collate(batch)
 
 
 class Trainer:
@@ -60,8 +64,9 @@ class Trainer:
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) >= MIN_SIZE)]
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) <= MAX_SIZE)]
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: all(char in AMINO_ACIDS for char in seq))]
-        return DataLoader(CustomDataset(dataframe, self.strategy), batch_size=self.batch_size,
-                          shuffle=(mode == "train"))
+        dataset = CustomDataset(dataframe, self.strategy)
+        return DataLoader(dataset, batch_size=self.batch_size,
+                          shuffle=(mode == "train"), collate_fn=dataset.collate_fn)
 
     def train(self, epochs=100):
         for epoch in range(epochs):
@@ -136,7 +141,6 @@ class Trainer:
 
 if __name__ == '__main__':
     data_path = os.path.join(MAIN_DIR, "pdb_data_130000")
-    strategy = SequenceToDistogram()
-    trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, test_size=0.15,
-                      pretrained_model_path=r"C:\Users\RoyIlani\Desktop\proteins\models\SequenceToDistogram\20240901\pretrained_4.pth")
-    trainer.train()
+    strategy = ContactMapToSequence()
+    trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, test_size=0.15)
+    trainer.train(epochs=10000)

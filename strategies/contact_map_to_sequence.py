@@ -94,7 +94,7 @@ class ContactMapToSequence(Base):
         for layer_idx, gat_layer in enumerate(self.gat_layers):
             x = gat_layer(x=x, edge_index=edge_index)
 
-        x = x.view((BATCH_SIZE, MAX_TRAINING_SIZE, self.hidden_size*self.num_heads))
+        x = x.view((mask_tensor.size(0), MAX_TRAINING_SIZE, self.hidden_size*self.num_heads))
 
         last_indices = mask_tensor.argmin(dim=1)
         x = x[torch.arange(x.size(0)), last_indices]
@@ -103,7 +103,6 @@ class ContactMapToSequence(Base):
         probabilities = F.softmax(x, dim=-1)
 
         return probabilities
-
 
     def compute_loss(self, outputs, ground_truth):
         return F.cross_entropy(outputs, ground_truth)

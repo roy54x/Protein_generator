@@ -20,14 +20,13 @@ class ContactMapToSequence(Base):
     def __init__(self):
         super(ContactMapToSequence, self).__init__()
         self.vocab_size = len(AMINO_ACIDS) + 1
-        self.hidden_size = 360
+        self.hidden_size = 180
         self.num_layers = 6
         self.num_heads = 6
-        self.gat_layer = GATConv(1, self.hidden_size, heads=self.num_heads)
         self.graph_layers = torch.nn.ModuleList([
-            GCNConv(self.vocab_size, self.hidden_size)]
-             + [GCNConv(self.hidden_size, self.hidden_size) for _ in range(self.num_layers - 1)])
-        self.linear = nn.Linear(self.hidden_size, self.vocab_size)
+            GATConv(self.vocab_size, self.hidden_size, heads=self.num_heads)]
+             + [GATConv(self.hidden_size * self.num_heads, self.hidden_size, heads=self.num_heads) for _ in range(self.num_layers - 1)])
+        self.linear = nn.Linear(self.hidden_size * self.num_heads, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, data, end=None):
         sequence = data['sequence']
@@ -94,7 +93,7 @@ class ContactMapToSequence(Base):
         for layer_idx, graph_layer in enumerate(self.graph_layers):
             x = graph_layer(x=x, edge_index=edge_index)
 
-        x = x.view((mask_tensor.size(0), MAX_TRAINING_SIZE, self.hidden_size))
+        x = x.view((mask_tensor.size(0), MAX_TRAINING_SIZE, self.hidden_size * self.num_heads))
 
         last_indices = mask_tensor.argmin(dim=1) - 1
         x = x[torch.arange(x.size(0)), last_indices]

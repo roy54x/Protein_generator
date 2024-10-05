@@ -24,12 +24,12 @@ class ContactMapToSequence(Base):
         self.num_layers = 6
         self.num_heads = 6
         self.gat_layer = GATConv(1, self.hidden_size, heads=self.num_heads)
-        self.gat_layers = torch.nn.ModuleList([
-            GATConv(self.vocab_size, self.hidden_size, heads=self.num_heads),
-            GATConv(self.hidden_size*self.num_heads, self.hidden_size, heads=self.num_heads),
-            GATConv(self.hidden_size*self.num_heads, self.hidden_size, heads=self.num_heads),
-            GATConv(self.hidden_size*self.num_heads, self.hidden_size, heads=self.num_heads)])
-        self.linear = nn.Linear(self.hidden_size*self.num_heads, self.vocab_size)
+        self.graph_layers = torch.nn.ModuleList([
+            GCNConv(self.vocab_size, self.vocab_size),
+            GCNConv(self.vocab_size, self.vocab_size),
+            GCNConv(self.vocab_size, self.vocab_size),
+            GCNConv(self.vocab_size, self.vocab_size)])
+        self.linear = nn.Linear(self.vocab_size, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, data, normalize_distogram=True):
         sequence = data['sequence']
@@ -91,12 +91,12 @@ class ContactMapToSequence(Base):
         x, edge_index, _, mask_tensor = inputs
         x = x.to(torch.float32)
 
-        for layer_idx, gat_layer in enumerate(self.gat_layers):
-            x = gat_layer(x=x, edge_index=edge_index)
+        for layer_idx, graph_layer in enumerate(self.graph_layers):
+            x = graph_layer(x=x, edge_index=edge_index)
 
-        x = x.view((mask_tensor.size(0), MAX_TRAINING_SIZE, self.hidden_size*self.num_heads))
+        x = x.view((mask_tensor.size(0), MAX_TRAINING_SIZE, self.vocab_size))
 
-        last_indices = mask_tensor.argmin(dim=1)
+        last_indices = mask_tensor.argmin(dim=1) - 1
         x = x[torch.arange(x.size(0)), last_indices]
 
         x = self.linear(x)

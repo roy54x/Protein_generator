@@ -20,15 +20,13 @@ class ContactMapToSequence(Base):
     def __init__(self):
         super(ContactMapToSequence, self).__init__()
         self.vocab_size = len(AMINO_ACIDS) + 1
-        self.hidden_size = 60
+        self.hidden_size = 360
         self.num_layers = 6
         self.num_heads = 6
         self.gat_layer = GATConv(1, self.hidden_size, heads=self.num_heads)
         self.graph_layers = torch.nn.ModuleList([
-            GCNConv(self.vocab_size, self.hidden_size),
-            GCNConv(self.hidden_size, self.hidden_size),
-            GCNConv(self.hidden_size, self.hidden_size),
-            GCNConv(self.hidden_size, self.hidden_size)])
+            GCNConv(self.vocab_size, self.hidden_size)]
+             + [GCNConv(self.hidden_size, self.hidden_size) for _ in range(self.num_layers - 1)])
         self.linear = nn.Linear(self.hidden_size, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, data, normalize_distogram=True):
@@ -45,8 +43,8 @@ class ContactMapToSequence(Base):
         ground_truth = F.one_hot(ground_truth, num_classes=self.vocab_size).float()
 
         # Get inputs
-        #sequence_tensor[len(sequence) - 1] = 0
         input_tensor = F.one_hot(sequence_tensor.to(torch.long), num_classes=self.vocab_size)
+        input_tensor[len(sequence) - 1] = 0
 
         contact_map = get_contact_map(data["coords"])
         contact_map = contact_map[start: end, start: end]
@@ -106,3 +104,9 @@ class ContactMapToSequence(Base):
 
     def compute_loss(self, outputs, ground_truth):
         return F.cross_entropy(outputs, ground_truth)
+
+    def evaluate(self, data):
+        ground_truth_sequence = data["sequence"]
+
+        for i in range(len(ground_truth_sequence)):
+            print(ground_truth_sequence[i])

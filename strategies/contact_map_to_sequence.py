@@ -27,7 +27,7 @@ class ContactMapToSequence(Base):
             GATConv(self.vocab_size, self.hidden_size, heads=self.num_heads)]
              + [GATConv(self.hidden_size * self.num_heads, self.hidden_size, heads=self.num_heads) for _ in range(self.num_layers - 1)])
         self.linear1 = nn.Linear(self.hidden_size * self.num_heads, self.hidden_size)
-        self.linear2 = nn.Linear(self.hidden_size * self.num_heads, self.vocab_size)
+        self.linear2 = nn.Linear(self.hidden_size, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, data, end=None):
         sequence = data['sequence']
@@ -104,7 +104,6 @@ class ContactMapToSequence(Base):
         x = self.linear2(x)
 
         probabilities = F.softmax(x, dim=-1)
-
         return probabilities
 
     def compute_loss(self, outputs, ground_truth):

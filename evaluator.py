@@ -1,12 +1,13 @@
 import pandas as pd
 import torch
 
+from strategies.contact_map_to_sequence import ContactMapToSequence
 from strategies.sequence_to_distogram import SequenceToDistogram
 
 if __name__ == '__main__':
-    strategy = SequenceToDistogram()
+    strategy = ContactMapToSequence()
 
-    model_path = r"C:\Users\RoyIlani\Desktop\proteins\models\SequenceToDistogram\20240904\pretrained.pth"
+    model_path = r"C:\Users\RoyIlani\Desktop\proteins\models\ContactMapToSequence\20241005\best_model.pth"
     state_dict = torch.load(model_path)
     strategy.load_state_dict(state_dict)
     strategy.eval()

@@ -29,10 +29,12 @@ class ContactMapToSequence(Base):
              + [GCNConv(self.hidden_size, self.hidden_size) for _ in range(self.num_layers - 1)])
         self.linear = nn.Linear(self.hidden_size, self.vocab_size)
 
-    def load_inputs_and_ground_truth(self, data, normalize_distogram=True):
+    def load_inputs_and_ground_truth(self, data, end=None):
         sequence = data['sequence']
         if self.training:
             start, end = self.get_augmentation_indices(len(sequence))
+        elif end:
+            start, end = max(0, end-MAX_TRAINING_SIZE), end
         else:
             start, end = 0, MAX_TRAINING_SIZE
         sequence = sequence[start: end]
@@ -83,10 +85,10 @@ class ContactMapToSequence(Base):
         ground_truth = torch.stack(ground_truth_list, dim=0)
         batch_index_tensor = torch.cat(batch_index_tensor)
 
-        return (input_tensors, edge_index, batch_index_tensor, mask_tensors), ground_truth
+        return (input_tensors, edge_index, mask_tensors), ground_truth
 
     def forward(self, inputs):
-        x, edge_index, _, mask_tensor = inputs
+        x, edge_index, mask_tensor = inputs
         x = x.to(torch.float32)
 
         for layer_idx, graph_layer in enumerate(self.graph_layers):
@@ -108,5 +110,17 @@ class ContactMapToSequence(Base):
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]
 
-        for i in range(len(ground_truth_sequence)):
-            print(ground_truth_sequence[i])
+        for idx in range(3):
+            print("real values: " + str(ground_truth_sequence[idx]) + ", predicted values: " + str(
+                ground_truth_sequence[idx]))
+
+        for idx in range(3, len(ground_truth_sequence) - 1):
+            (x, edge_index, mask_tensor), _ = self.load_inputs_and_ground_truth(
+                data, idx)
+
+            mask_tensor = mask_tensor.unsqueeze(0)
+            output = self.forward((x, edge_index, mask_tensor))
+            predicted_values = AMINO_ACIDS[torch.argmax(output).item()]
+
+            print("real values: " + str(ground_truth_sequence[idx]) + ", predicted values: " + str(
+                predicted_values))

@@ -123,11 +123,11 @@ class SequenceToDistogram(Base):
         return average_loss
 
     def evaluate(self, data):
-        ground_truth_coords = np.array(data["coords"], dtype="float16")[:100]
+        ground_truth_coords = np.array(data["coords"], dtype="float16")[:MAX_TRAINING_SIZE]
         seq_len = len(data["sequence"])
         (x_tensor, mask_tensor), ground_truth_distogram = self.load_inputs_and_ground_truth(
             data, normalize_distogram=False)
-        ground_truth_distogram = ground_truth_distogram[: 100, :100]
+        ground_truth_distogram = ground_truth_distogram[: MAX_TRAINING_SIZE, :MAX_TRAINING_SIZE]
 
         # Get model prediction
         predicted_distogram = self.forward((x_tensor.unsqueeze(0), mask_tensor.unsqueeze(0)))[0]

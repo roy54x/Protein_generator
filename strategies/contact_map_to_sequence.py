@@ -26,7 +26,8 @@ class ContactMapToSequence(Base):
         self.graph_layers = torch.nn.ModuleList([
             GATConv(self.vocab_size, self.hidden_size, heads=self.num_heads)]
              + [GATConv(self.hidden_size * self.num_heads, self.hidden_size, heads=self.num_heads) for _ in range(self.num_layers - 1)])
-        self.linear = nn.Linear(self.hidden_size * self.num_heads, self.vocab_size)
+        self.linear1 = nn.Linear(self.hidden_size * self.num_heads, self.hidden_size)
+        self.linear2 = nn.Linear(self.hidden_size * self.num_heads, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, data, end=None):
         sequence = data['sequence']
@@ -98,7 +99,10 @@ class ContactMapToSequence(Base):
         last_indices = mask_tensor.argmin(dim=1) - 1
         x = x[torch.arange(x.size(0)), last_indices]
 
-        x = self.linear(x)
+        x = self.linear1(x)
+        x = F.relu(x)
+        x = self.linear2(x)
+
         probabilities = F.softmax(x, dim=-1)
 
         return probabilities
@@ -115,11 +119,11 @@ class ContactMapToSequence(Base):
 
         for idx in range(3, len(ground_truth_sequence) - 1):
             (x, edge_index, mask_tensor), _ = self.load_inputs_and_ground_truth(
-                data, idx)
+                data, idx + 1)
 
             mask_tensor = mask_tensor.unsqueeze(0)
             output = self.forward((x, edge_index, mask_tensor))
-            predicted_values = AMINO_ACIDS[torch.argmax(output).item()]
+            predicted_values = AMINO_ACIDS[torch.argmax(output).item() - 1]
 
             print("real values: " + str(ground_truth_sequence[idx]) + ", predicted values: " + str(
                 predicted_values))

@@ -47,6 +47,7 @@ class ContactMapToSequence(Base):
         # Get inputs
         input_tensor = F.one_hot(sequence_tensor.to(torch.long), num_classes=self.vocab_size)
         input_tensor[len(sequence) - 1] = 0
+        input_tensor = input_tensor.to(torch.float32)
 
         contact_map = get_contact_map(data["coords"])
         contact_map = contact_map[start: end, start: end]
@@ -89,7 +90,6 @@ class ContactMapToSequence(Base):
 
     def forward(self, inputs):
         x, edge_index, mask_tensor = inputs
-        x = x.to(torch.float32)
 
         for layer_idx, graph_layer in enumerate(self.graph_layers):
             x = graph_layer(x=x, edge_index=edge_index)

@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,7 +7,8 @@ import transformers
 from constants import AMINO_ACIDS, MAX_TRAINING_SIZE
 from strategies.base import Base
 from utils.padding_functions import padd_sequence, padd_contact_map
-from utils.structure_utils import get_distogram
+from utils.structure_utils import get_distogram, plot_contact_map, optimize_points_from_distogram, align_points, \
+    plot_protein_atoms
 from utils.utils import normalize
 
 
@@ -119,3 +121,25 @@ class SequenceToDistogram(Base):
         average_loss = l1_loss_per_sample.mean()  # Shape: 1
 
         return average_loss
+
+    def evaluate(self, data):
+        ground_truth_coords = np.array(data["coords"], dtype="float16")[:100]
+        seq_len = len(data["sequence"])
+        (x_tensor, mask_tensor), ground_truth_distogram = self.load_inputs_and_ground_truth(
+            data, normalize_distogram=False)
+        ground_truth_distogram = ground_truth_distogram[: 100, :100]
+
+        # Get model prediction
+        predicted_distogram = self.forward((x_tensor.unsqueeze(0), mask_tensor.unsqueeze(0)))[0]
+        predicted_distogram = predicted_distogram.squeeze().detach().numpy()
+        predicted_distogram = predicted_distogram[: seq_len, :seq_len]
+        predicted_distogram = (predicted_distogram + predicted_distogram.T) / 2
+        predicted_distogram *= ground_truth_distogram.max().numpy()
+
+        # Plot the predicted distogram and the ground truth distogram
+        plot_contact_map(predicted_distogram, ground_truth_distogram)
+
+        # Plot the aligned predicted coordinates with the ground truth coordinates
+        predicted_coords = optimize_points_from_distogram(predicted_distogram)
+        aligned_predicted_coords = align_points(predicted_coords, ground_truth_coords)
+        plot_protein_atoms(aligned_predicted_coords, ground_truth_coords)

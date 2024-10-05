@@ -32,3 +32,6 @@ class Base(nn.Module):
     def forward(self, x):
         raise NotImplementedError("Each strategy must implement this method.")
 
+    def evaluate(self, data):
+        raise NotImplementedError("Each strategy must implement this method.")
+

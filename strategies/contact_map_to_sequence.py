@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 import transformers
 from torch import nn
-from torch_geometric.nn import GATConv
+from torch_geometric.nn import GATConv, GCNConv
 from torch_geometric.utils import from_scipy_sparse_matrix
 
 from constants import AMINO_ACIDS, MAX_TRAINING_SIZE, BATCH_SIZE
@@ -25,11 +25,11 @@ class ContactMapToSequence(Base):
         self.num_heads = 6
         self.gat_layer = GATConv(1, self.hidden_size, heads=self.num_heads)
         self.graph_layers = torch.nn.ModuleList([
-            GCNConv(self.vocab_size, self.vocab_size),
-            GCNConv(self.vocab_size, self.vocab_size),
-            GCNConv(self.vocab_size, self.vocab_size),
-            GCNConv(self.vocab_size, self.vocab_size)])
-        self.linear = nn.Linear(self.vocab_size, self.vocab_size)
+            GCNConv(self.vocab_size, self.hidden_size),
+            GCNConv(self.hidden_size, self.hidden_size),
+            GCNConv(self.hidden_size, self.hidden_size),
+            GCNConv(self.hidden_size, self.hidden_size)])
+        self.linear = nn.Linear(self.hidden_size, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, data, normalize_distogram=True):
         sequence = data['sequence']
@@ -45,7 +45,7 @@ class ContactMapToSequence(Base):
         ground_truth = F.one_hot(ground_truth, num_classes=self.vocab_size).float()
 
         # Get inputs
-        sequence_tensor[len(sequence) - 1] = 0
+        #sequence_tensor[len(sequence) - 1] = 0
         input_tensor = F.one_hot(sequence_tensor.to(torch.long), num_classes=self.vocab_size)
 
         contact_map = get_contact_map(data["coords"])
@@ -94,7 +94,7 @@ class ContactMapToSequence(Base):
         for layer_idx, graph_layer in enumerate(self.graph_layers):
             x = graph_layer(x=x, edge_index=edge_index)
 
-        x = x.view((mask_tensor.size(0), MAX_TRAINING_SIZE, self.vocab_size))
+        x = x.view((mask_tensor.size(0), MAX_TRAINING_SIZE, self.hidden_size))
 
         last_indices = mask_tensor.argmin(dim=1) - 1
         x = x[torch.arange(x.size(0)), last_indices]

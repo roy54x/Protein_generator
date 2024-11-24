@@ -1,4 +1,4 @@
-MAIN_DIR = r"C:\Users\RoyIlani\Desktop\proteins"
+MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
 
 NUM_SAMPLES_IN_DATAFRAME = 10000
 

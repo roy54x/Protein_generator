@@ -93,6 +93,7 @@ class ContactMapToSequence(Base):
 
         for layer_idx, graph_layer in enumerate(self.graph_layers):
             x = graph_layer(x=x, edge_index=edge_index)
+            x = F.leaky_relu(x)
 
         x = x.view((mask_tensor.size(0), MAX_TRAINING_SIZE, self.hidden_size * self.num_heads))
 
@@ -100,7 +101,7 @@ class ContactMapToSequence(Base):
         x = x[torch.arange(x.size(0)), last_indices]
 
         x = self.linear1(x)
-        x = F.relu(x)
+        x = F.leaky_relu(x)
         x = self.linear2(x)
 
         probabilities = F.softmax(x, dim=-1)

@@ -118,6 +118,7 @@ def extract_amino_acid_chains(structure):
     chain_ids = []
     chain_sequences = []
     chain_coords = []
+
     for model in structure:
         for chain in model:
             sequence = []
@@ -125,17 +126,20 @@ def extract_amino_acid_chains(structure):
             for residue in chain:
                 letter = seq1(residue.resname)
                 # Filter out non-amino acid residues
-                if residue.id[0] == ' ' and 'CA' in residue and letter in AMINO_ACIDS:
+                if (residue.id[0] == ' ' and all(atom in residue for atom in ['N', 'CA', 'C'])
+                        and letter in AMINO_ACIDS):
                     sequence.append(letter)
-                    ca_atom = residue['CA']
-                    coords.append(ca_atom.get_coord())
+                    atom_coords = []
+                    for atom in ['N', 'CA', 'C']:
+                        atom_coords.append(residue[atom].get_coord())
+                    coords.append(atom_coords)  # Append as Lx3 array
             chain_ids.append(chain.id)
             chain_sequences.append(''.join(sequence))
-            chain_coords.append(np.array(coords))
+            chain_coords.append(np.array(coords))  # Final shape: Lx3x3
+
     return chain_ids, chain_sequences, chain_coords
 
 
-# 5. Function to extract structure info
 def get_structure_info(structure):
     return {
         "num_chains": len(list(structure.get_chains())),

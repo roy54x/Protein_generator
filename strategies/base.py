@@ -16,8 +16,7 @@ class Base(nn.Module):
         start = random.randint(0, max(0, seq_len - length))
         return start, start+length
 
-    @staticmethod
-    def collate(batch):
+    def collate(self, batch):
         input_tensors, ground_truth_list = zip(*batch)
         input_tensors = torch.stack(input_tensors, dim=0)
         ground_truth = torch.stack(ground_truth_list, dim=0)

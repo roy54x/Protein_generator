@@ -57,8 +57,7 @@ class ContactMapToSequence(Base):
 
         return (input_tensor, edge_index, mask_tensor), ground_truth
 
-    @staticmethod
-    def collate(batch):
+    def collate(self, batch):
         inputs_list, ground_truth_list = zip(*batch)
         input_tensors, edge_indices, mask_tensors = zip(*inputs_list)
 

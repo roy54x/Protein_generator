@@ -1,4 +1,4 @@
-MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
+MAIN_DIR = r"D:\python project\data\Proteins"
 
 NUM_SAMPLES_IN_DATAFRAME = 10000
 

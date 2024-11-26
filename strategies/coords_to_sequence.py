@@ -1,4 +1,5 @@
 import esm
+import torch
 import torch.nn.functional as F
 from esm.inverse_folding.gvp_transformer import GVPTransformerModel
 from esm.inverse_folding.util import CoordBatchConverter
@@ -28,19 +29,20 @@ class CoordsToSequence(Base):
         sequence = sequence[start: end]
         coords = data["coords"][start: end]
 
-        # Get inputs
-        batch = [(coords, None, sequence)]
+        return (coords, None, sequence), None
+
+    def collate(self, batch):
+        batch = [x[0] for x in batch]
         coords, confidence, strs, tokens, padding_mask = self.batch_converter(batch, device=self.device)
         prev_output_tokens = tokens[:, :-1]
-
-        # Get ground truth
         ground_truth = tokens[:, 1:]
 
-        return (coords, prev_output_tokens), ground_truth
+        return (coords, padding_mask, confidence, prev_output_tokens), ground_truth
+
 
     def forward(self, inputs):
-        (coords, prev_output_tokens) = inputs
-        outputs, _ = self.gvp_transformer(coords, None, None, prev_output_tokens)
+        coords, padding_mask, confidence, prev_output_tokens = inputs
+        outputs, _ = self.gvp_transformer(coords, padding_mask, confidence, prev_output_tokens)
         return outputs
 
     def compute_loss(self, outputs, ground_truth):

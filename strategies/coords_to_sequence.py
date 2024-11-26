@@ -59,7 +59,7 @@ class CoordsToSequence(Base):
         return outputs
 
     def compute_loss(self, outputs, ground_truth):
-        return F.cross_entropy(outputs, ground_truth, reduction='none')
+        return F.cross_entropy(outputs, ground_truth)
 
     def evaluate(self, data):
         pass

@@ -1,9 +1,9 @@
-MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
+MAIN_DIR = r"D:\python project\data\Proteins"
 
 NUM_SAMPLES_IN_DATAFRAME = 10000
 
-AMINO_ACIDS = 'ACDEFGHIKLMNPQRSTVWY'
-NON_STANDARD_AMINO_ACIDS = "UZX"
+AMINO_ACIDS = 'LAGVSERTIDPKQNFYMHWCXBUZO.-'
+NON_STANDARD_AMINO_ACIDS = ""
 AMINO_ACID_TO_INDEX = {aa: i + 1 for i, aa in enumerate(AMINO_ACIDS)}  # 1-indexed for padding
 
 MIN_SIZE = 3

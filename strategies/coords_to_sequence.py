@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from esm.inverse_folding.gvp_transformer import GVPTransformerModel
 from esm.inverse_folding.util import CoordBatchConverter
 
-from constants import MAX_TRAINING_SIZE
+from constants import MAX_TRAINING_SIZE, AMINO_ACIDS, MIN_SIZE
 from strategies.base import Base
 
 
@@ -37,7 +37,7 @@ class CoordsToSequence(Base):
         if self.training:
             start, end = self.get_augmentation_indices(len(sequence))
         elif end:
-            start, end = max(0, end-MAX_TRAINING_SIZE), end
+            start, end = max(0, end - MAX_TRAINING_SIZE), end
         else:
             start, end = 0, MAX_TRAINING_SIZE
         sequence = sequence[start: end]
@@ -62,4 +62,10 @@ class CoordsToSequence(Base):
         return F.cross_entropy(outputs, ground_truth)
 
     def evaluate(self, data):
-        pass
+        ground_truth_sequence = data["sequence"]
+        partial_seq = ground_truth_sequence[:MIN_SIZE+1]
+        coords = data["coords"]
+        predicted_sequence = self.gvp_transformer.sample(coords, partial_seq=partial_seq)
+
+        for idx in range(0, len(ground_truth_sequence)):
+            print("real values: " + str(ground_truth_sequence[idx]) + ", predicted values: " + str(predicted_sequence[idx]))

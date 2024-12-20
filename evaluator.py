@@ -1,6 +1,10 @@
+import json
+import os.path
+
 import pandas as pd
 import torch
 
+from constants import MAIN_DIR
 from strategies.contact_map_to_sequence import ContactMapToSequence
 from strategies.coords_to_sequence import CoordsToSequence
 from strategies.sequence_to_distogram import SequenceToDistogram
@@ -8,15 +12,25 @@ from strategies.sequence_to_distogram import SequenceToDistogram
 if __name__ == '__main__':
     strategy = CoordsToSequence()
 
-    model_path = r"D:\python project\data\Proteins\models\CoordsToSequence\20241126\best_model.pth"
+    model_path = os.path.join(MAIN_DIR, r"models\CoordsToSequence\20241128\best_model.pth")
     state_dict = torch.load(model_path)
     strategy.load_state_dict(state_dict)
     strategy.eval()
 
-    data_path = r"C:\Users\RoyIlani\Desktop\personal\proteins\pdb_data\pdb_df_5.json"
-    pdb_df = pd.read_json(data_path, lines=True)
-    pdb_id = "7MQS"
-    chain_id = "A"
-    data = pdb_df.loc[(pdb_df['pdb_id'] == pdb_id) & (pdb_df['chain_id'] == chain_id)].iloc[0]
+    cath_json_file = os.path.join(MAIN_DIR, "cath_data", "cath_data.json")
+    cath_df = pd.read_json(cath_json_file)
+    cath_df = cath_df[cath_df["dataset"] == "test"]
+    print(f"Number of sequences in the test set is: {len(cath_df)}")
 
-    strategy.evaluate(data)
+    total_recovery_rate = 0
+    total_sequences = 0
+    for i, data in cath_df.iterrows():
+        recovery_rate = strategy.evaluate(data)
+
+        if recovery_rate:
+            total_recovery_rate += recovery_rate
+            total_sequences += 1
+
+    # Calculate the average recovery rate over all sequences
+    average_recovery_rate = total_recovery_rate / total_sequences if total_sequences > 0 else 0
+    print(f"Overall average recovery rate: {average_recovery_rate:.4f}")

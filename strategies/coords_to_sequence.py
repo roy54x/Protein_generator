@@ -1,4 +1,5 @@
 import esm
+import numpy as np
 import torch
 import torch.nn.functional as F
 from esm.inverse_folding.gvp_transformer import GVPTransformerModel
@@ -61,9 +62,22 @@ class CoordsToSequence(Base):
 
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]
-        partial_seq = ground_truth_sequence[:MIN_SIZE+1]
+        partial_seq = ground_truth_sequence[:MIN_SIZE + 1]
         coords = data["coords"]
+        chain_id = data["chain_id"]
+
+        if any(any(None in atom_coords for atom_coords in residue) for residue in coords):
+            print(f"Skipping entry due to None in coords")
+            return
+
+        # Get the predicted sequence from the model
         predicted_sequence = self.gvp_transformer.sample(coords, partial_seq=partial_seq)
 
-        for idx in range(0, len(ground_truth_sequence)):
-            print("real values: " + str(ground_truth_sequence[idx]) + ", predicted values: " + str(predicted_sequence[idx]))
+        # Compare ground truth and predicted sequence directly using vectorized operations
+        correct_predictions = sum(1 for a, b in zip(predicted_sequence, ground_truth_sequence) if a == b)
+        total_predictions = len(ground_truth_sequence)
+
+        # Calculate and print the average recovery rate
+        recovery_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
+        print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
+        return recovery_rate

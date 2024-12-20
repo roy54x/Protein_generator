@@ -30,11 +30,17 @@ class ContactMapToSequence(Base):
         self.linear2 = nn.Linear(self.hidden_size, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
-        # Initialize lists to store batched data
-        inputs_list, ground_truth_list = [], []
+        input_tensors_list = []
+        edge_index_list = []
+        mask_tensors_list = []
+        ground_truth_list = []
+        batch_index_tensor = []
 
-        for data in batch_data:
+        total_nodes = 0
+
+        for batch_idx, data in enumerate(batch_data):
             sequence = data['sequence']
+            ca_coords = [coord[1] for coord in data["coords"]]
 
             # Determine start and end indices for augmentation or slicing
             if self.training:
@@ -48,51 +54,42 @@ class ContactMapToSequence(Base):
             sequence = sequence[start:end]
             sequence_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
-            # Prepare ground truth
-            ground_truth = copy.deepcopy(sequence_tensor[len(sequence) - 1]).to(torch.long)
-            ground_truth = F.one_hot(ground_truth, num_classes=self.vocab_size).float()
-
             # Prepare inputs
             input_tensor = F.one_hot(sequence_tensor.to(torch.long), num_classes=self.vocab_size)
             input_tensor[len(sequence) - 1] = 0
             input_tensor = input_tensor.to(torch.float32)
 
+            # Prepare ground truth
+            ground_truth = copy.deepcopy(sequence_tensor[len(sequence) - 1]).to(torch.long)
+            ground_truth = F.one_hot(ground_truth, num_classes=self.vocab_size).float()
+
             # Prepare contact map and edge index
-            contact_map = get_contact_map(data["coords"])
+            contact_map = get_contact_map(ca_coords)
             contact_map = contact_map[start:end, start:end]
             contact_map = padd_contact_map(contact_map, MAX_TRAINING_SIZE)
             contact_map = sp.sparse.csr_matrix(contact_map)
             edge_index, _ = from_scipy_sparse_matrix(contact_map)
 
-            # Append to batch lists
-            inputs_list.append((input_tensor, edge_index, mask_tensor))
-            ground_truth_list.append(ground_truth)
-
-        # Collation logic
-        input_tensors, edge_indices, mask_tensors = zip(*inputs_list)
-
-        # Concatenate input tensors
-        input_tensors = torch.cat(input_tensors, dim=0)
-
-        edge_index_list = []
-        batch_offsets = []
-        total_nodes = 0
-        batch_index_tensor = []
-
-        for batch_idx, (edge_index, input_tensor) in enumerate(zip(edge_indices, input_tensors)):
-            batch_offset = total_nodes
-            batch_offsets.append(batch_offset)
-
-            adjusted_edge_index = edge_index + batch_offset
+            # Adjust edge index and maintain batch offsets
+            adjusted_edge_index = edge_index + total_nodes
             edge_index_list.append(adjusted_edge_index)
 
+            # Prepare batch index tensor
             num_nodes = input_tensor.size(0)
             batch_index_tensor.append(torch.full((num_nodes,), batch_idx, dtype=torch.long))
 
+            # Append to batched lists
+            input_tensors_list.append(input_tensor)
+            mask_tensors_list.append(mask_tensor)
+            ground_truth_list.append(ground_truth)
+
+            # Update total nodes for the next batch
             total_nodes += num_nodes
 
+        # Concatenate batched tensors
+        input_tensors = torch.cat(input_tensors_list, dim=0)
         edge_index = torch.cat(edge_index_list, dim=1)
-        mask_tensors = torch.stack(mask_tensors, dim=0)
+        mask_tensors = torch.stack(mask_tensors_list, dim=0)
         ground_truth = torch.stack(ground_truth_list, dim=0)
         batch_index_tensor = torch.cat(batch_index_tensor)
 

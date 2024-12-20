@@ -141,7 +141,8 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    data_path = os.path.join(MAIN_DIR, "pdb_data_130000")
+    data_path = os.path.join(MAIN_DIR, "pdb_data")
+    pretrained_model_path = os.path.join(MAIN_DIR)
     strategy = CoordsToSequence()
     trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, test_size=0.15)
     trainer.train(epochs=10000)

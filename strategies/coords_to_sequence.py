@@ -41,17 +41,6 @@ class CoordsToSequence(Base):
         for data in batch_data:
             sequence = data['sequence']
             coords = data['coords']
-
-            if self.training:
-                start, end = self.get_augmentation_indices(len(sequence))
-            elif end:
-                start, end = max(0, end - MAX_TRAINING_SIZE), end
-            else:
-                start, end = 0, MAX_TRAINING_SIZE
-
-            sequence = sequence[start:end]
-            coords = coords[start: end]
-
             batch_converter_input.append((coords, None, sequence))
 
         coords, confidence, strs, tokens, padding_mask = self.batch_converter(

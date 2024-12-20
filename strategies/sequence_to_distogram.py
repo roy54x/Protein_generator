@@ -17,7 +17,7 @@ class SequenceToDistogram(Base):
     def __init__(self):
         super(SequenceToDistogram, self).__init__()
 
-        self.hidden_size = 64
+        self.hidden_size = 32
 
         config = transformers.RobertaConfig(
             vocab_size=len(AMINO_ACIDS) + 1,
@@ -30,33 +30,47 @@ class SequenceToDistogram(Base):
         self.transformer = transformers.RobertaModel(config=config)
 
         self.mlp = nn.Sequential(
-            nn.Linear(4 * self.hidden_size + 1, 64),
+            nn.Linear(4 * self.hidden_size + 1, 32),
             nn.ReLU(),
-            nn.Linear(64, 64),
+            nn.Linear(32, 32),
             nn.ReLU(),
-            nn.Linear(64, 1),
+            nn.Linear(32, 1),
             nn.ReLU())
 
-    def load_inputs_and_ground_truth(self, data, normalize_distogram=True):
-        sequence = data['sequence']
+    def load_inputs_and_ground_truth(self, batch_data, normalize_distogram=True):
+        x_tensors, mask_tensors, ground_truths = [], [], []
 
-        if self.training:
-            start, end = self.get_augmentation_indices(len(sequence))
-        else:
-            start, end = 0, MAX_TRAINING_SIZE
+        for data in batch_data:
+            sequence = data['sequence']
+            ca_coords = [coord[1] for coord in data["coords"]]
 
-        # Get input
-        sequence = sequence[start: end]
-        x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
+            if self.training:
+                start, end = self.get_augmentation_indices(len(sequence))
+            else:
+                start, end = 0, MAX_TRAINING_SIZE
 
-        # Get ground truth
-        distogram = get_distogram(data["coords"])
-        distogram = distogram[start: end, start: end]
-        if normalize_distogram:
-            distogram = normalize(distogram)
-        ground_truth = padd_contact_map(distogram, MAX_TRAINING_SIZE)
+            # Get input
+            sequence = sequence[start: end]
+            x_tensor, mask_tensor = padd_sequence(sequence, MAX_TRAINING_SIZE)
 
-        return (x_tensor, mask_tensor), ground_truth
+            # Get ground truth
+            distogram = get_distogram(ca_coords)
+            distogram = distogram[start: end, start: end]
+            if normalize_distogram:
+                distogram = normalize(distogram)
+            ground_truth = padd_contact_map(distogram, MAX_TRAINING_SIZE)
+
+            # Append to batch lists
+            x_tensors.append(x_tensor)
+            mask_tensors.append(mask_tensor)
+            ground_truths.append(ground_truth)
+
+        # Stack tensors for batch
+        x_tensors = torch.stack(x_tensors, dim=0)
+        mask_tensors = torch.stack(mask_tensors, dim=0)
+        ground_truths = torch.stack(ground_truths, dim=0)
+
+        return (x_tensors, mask_tensors), ground_truths
 
     def get_indices_difference(self, x, batch_size, max_tokens):
         i_indices = (torch.arange(max_tokens).view(1, max_tokens, 1)

@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME, BATCH_SIZE
 from strategies.contact_map_to_sequence import ContactMapToSequence
+from strategies.coords_to_latent_space import CoordsToLatentSpace
 from strategies.coords_to_sequence import CoordsToSequence
 from strategies.sequence_to_distogram import SequenceToDistogram
 
@@ -23,12 +24,11 @@ class CustomDataset(Dataset):
         return len(self.dataframe)
 
     def __getitem__(self, idx):
-        row = self.dataframe.iloc[idx]
-        inputs, ground_truth = self.strategy.load_inputs_and_ground_truth(row)
-        return inputs, ground_truth
+        return self.dataframe.iloc[idx]
 
     def collate_fn(self, batch):
-        return self.strategy.collate(batch)
+        inputs, ground_truth = self.strategy.load_inputs_and_ground_truth(batch)
+        return inputs, ground_truth
 
 
 class Trainer:

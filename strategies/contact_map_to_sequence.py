@@ -30,11 +30,11 @@ class ContactMapToSequence(Base):
         self.linear2 = nn.Linear(self.hidden_size, self.vocab_size)
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
-        input_tensors, edge_indices, mask_tensors, ground_truths = [], [], [], []
+        # Initialize lists to store batched data
+        inputs_list, ground_truth_list = [], []
 
         for data in batch_data:
             sequence = data['sequence']
-            ca_coords = [coord[1] for coord in data["coords"]]
 
             # Determine start and end indices for augmentation or slicing
             if self.training:
@@ -58,29 +58,20 @@ class ContactMapToSequence(Base):
             input_tensor = input_tensor.to(torch.float32)
 
             # Prepare contact map and edge index
-            contact_map = get_contact_map(ca_coords)
+            contact_map = get_contact_map(data["coords"])
             contact_map = contact_map[start:end, start:end]
             contact_map = padd_contact_map(contact_map, MAX_TRAINING_SIZE)
             contact_map = sp.sparse.csr_matrix(contact_map)
             edge_index, _ = from_scipy_sparse_matrix(contact_map)
 
-            # Append processed data to batch lists
-            input_tensors.append(input_tensor)
-            edge_indices.append(edge_index)
-            mask_tensors.append(mask_tensor)
-            ground_truths.append(ground_truth)
+            # Append to batch lists
+            inputs_list.append((input_tensor, edge_index, mask_tensor))
+            ground_truth_list.append(ground_truth)
 
-        # Collate batched data
-        input_tensors = torch.stack(input_tensors, dim=0)  # Shape: (batch_size, max_size, vocab_size)
-        mask_tensors = torch.stack(mask_tensors, dim=0)  # Shape: (batch_size, max_size)
-        ground_truths = torch.stack(ground_truths, dim=0)  # Shape: (batch_size, vocab_size)
-
-        return (input_tensors, edge_indices, mask_tensors), ground_truths
-
-    def collate(self, batch):
-        inputs_list, ground_truth_list = zip(*batch)
+        # Collation logic
         input_tensors, edge_indices, mask_tensors = zip(*inputs_list)
 
+        # Concatenate input tensors
         input_tensors = torch.cat(input_tensors, dim=0)
 
         edge_index_list = []

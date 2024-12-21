@@ -62,16 +62,14 @@ class CoordsToSequence(Base):
 
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]
-        partial_seq = ground_truth_sequence[:MIN_SIZE + 1]
         coords = data["coords"]
         chain_id = data["chain_id"]
 
-        if any(any(None in atom_coords for atom_coords in residue) for residue in coords):
-            print(f"Skipping entry due to None in coords")
-            return
+        coords = [[[float('inf') if x is None else x for x in row]
+                   for row in layer] for layer in coords]
 
         # Get the predicted sequence from the model
-        predicted_sequence = self.gvp_transformer.sample(coords, partial_seq=partial_seq)
+        predicted_sequence = self.gvp_transformer.sample(coords)
 
         # Compare ground truth and predicted sequence directly using vectorized operations
         correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))

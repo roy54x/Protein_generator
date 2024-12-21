@@ -65,11 +65,11 @@ class CoordsToSequence(Base):
         coords = data["coords"]
         chain_id = data["chain_id"]
 
-        coords = [[[float('inf') if x is None else x for x in row]
-                   for row in layer] for layer in coords]
+        coords = [[[float('inf') if x is None else x for x in coordinates]
+                   for coordinates in atom] for atom in coords]
 
         # Get the predicted sequence from the model
-        predicted_sequence = self.gvp_transformer.sample(coords)
+        predicted_sequence = self.gvp_transformer.sample(coords, temperature=1e-6)
 
         # Compare ground truth and predicted sequence directly using vectorized operations
         correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))

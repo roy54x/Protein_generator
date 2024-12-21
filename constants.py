@@ -1,6 +1,6 @@
 MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
 
-NUM_SAMPLES_IN_DATAFRAME = 10000
+NUM_SAMPLES_IN_DATAFRAME = 1000
 
 AMINO_ACIDS = ['<null_0>', '<pad>', '<eos>', '<unk>', 'L', 'A', 'G', 'V', 'S', 'E',
                'R', 'T', 'I', 'D', 'P', 'K', 'Q', 'N', 'F', 'Y', 'M', 'H', 'W', 'C',

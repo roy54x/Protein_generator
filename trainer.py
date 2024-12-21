@@ -32,7 +32,7 @@ class CustomDataset(Dataset):
 
 
 class Trainer:
-    def __init__(self, directory, strategy, batch_size=32, test_size=0.2, device="cuda:0", pretrained_model_path=""):
+    def __init__(self, directory, strategy, batch_size=32, val_size=0.2, device="cuda:0", pretrained_model_path=""):
         self.directory = directory
         self.strategy = strategy.to(device)
         self.pretrained_model_path = pretrained_model_path
@@ -44,14 +44,14 @@ class Trainer:
             self.pretrained_model_path = None
 
         self.batch_size = batch_size
-        self.test_size = test_size
+        self.test_size = val_size
         self.device = device
         self.optimizer = torch.optim.Adam(strategy.parameters(), lr=0.001)
         self.best_test_loss = float('inf')
 
         # Collect all file paths from the directory
         self.file_paths = [os.path.join(directory, fname) for fname in os.listdir(directory) if fname.endswith('.json')]
-        self.train_files, self.test_files = train_test_split(self.file_paths, test_size=test_size, random_state=42,
+        self.train_files, self.test_files = train_test_split(self.file_paths, test_size=val_size, random_state=42,
                                                              shuffle=False)
         self.train_size = len(self.train_files) * NUM_SAMPLES_IN_DATAFRAME
         self.test_size = len(self.test_files) * NUM_SAMPLES_IN_DATAFRAME
@@ -141,8 +141,8 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    data_path = os.path.join(MAIN_DIR, "pdb_data")
+    data_path = os.path.join(MAIN_DIR, "cath_data/train_set")
     pretrained_model_path = os.path.join(MAIN_DIR)
-    strategy = CoordsToSequence()
-    trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, test_size=0.15)
+    strategy = CoordsToLatentSpace()
+    trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, val_size=0.15)
     trainer.train(epochs=10000)

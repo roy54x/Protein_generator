@@ -22,7 +22,7 @@ class CoordsToLatentSpace(Base):
         self.args.max_tokens = MAX_TRAINING_SIZE
 
         self.gvp_encoder = GVPEncoder(self.args)
-        self.device = next(self.model.parameters()).device
+        self.device = next(self.gvp_encoder.parameters()).device
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
         batch_sequences = [data['sequence'] for data in batch_data]

@@ -14,9 +14,9 @@ class CoordsToSequence(Base):
 
     def __init__(self):
         super(CoordsToSequence, self).__init__()
-        self.model, self.alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
+        self.pretrained_model, self.alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
 
-        self.args = self.model.args
+        self.args = self.pretrained_model.args
         self.args.encoder_embed_dim = 64
         self.args.decoder_embed_dim = 64
         self.args.decoder_input_dim = 64
@@ -34,7 +34,7 @@ class CoordsToSequence(Base):
 
         self.gvp_transformer = GVPTransformerModel(self.args, self.alphabet)
         self.batch_converter = CoordBatchConverter(self.alphabet)
-        self.device = next(self.model.parameters()).device
+        self.device = next(self.gvp_transformer.parameters()).device
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
         batch_converter_input = []
@@ -54,7 +54,7 @@ class CoordsToSequence(Base):
 
     def forward(self, inputs):
         coords, padding_mask, confidence, prev_output_tokens = inputs
-        outputs, _ = self.gvp_transformer(coords, padding_mask, confidence, prev_output_tokens)
+        outputs, _ = self.model(coords, padding_mask, confidence, prev_output_tokens)
         return outputs
 
     def compute_loss(self, outputs, ground_truth):
@@ -74,7 +74,7 @@ class CoordsToSequence(Base):
         predicted_sequence = self.gvp_transformer.sample(coords, partial_seq=partial_seq)
 
         # Compare ground truth and predicted sequence directly using vectorized operations
-        correct_predictions = sum(1 for a, b in zip(predicted_sequence, ground_truth_sequence) if a == b)
+        correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))
         total_predictions = len(ground_truth_sequence)
 
         # Calculate and print the average recovery rate

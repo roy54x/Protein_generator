@@ -8,6 +8,7 @@ from esm.inverse_folding.gvp_transformer import GVPTransformerModel
 from esm.inverse_folding.util import CoordBatchConverter
 from proteinbert import load_pretrained_model
 from proteinbert.conv_and_global_attention_model import get_model_with_hidden_layers_as_outputs
+from torch import nan_to_num
 
 from constants import MAX_TRAINING_SIZE, MIN_SIZE
 from strategies.base import Base
@@ -44,12 +45,14 @@ class CoordsToLatentSpace(Base):
             batch_sequences.append(data['sequence'])
             batch_converter_input.append((coords, None, sequence))
 
-        coords, _, _, _, _ = self.batch_converter(batch_converter_input, device=self.device)
+        coords, confidence, _, _, padding_mask = self.batch_converter(batch_converter_input, device=self.device)
+        coord_mask = torch.all(torch.all(torch.isfinite(coords), dim=-1), dim=-1)
+        coords = nan_to_num(coords)
 
         encoded_x = self.protein_bert_tokenizer.encode_X(batch_sequences, MAX_TRAINING_SIZE)
         local_representations, global_representations = self.protein_bert_model.predict(encoded_x, batch_size=1)
 
-        return (coords, None, None, None), (local_representations, global_representations)
+        return (coords, coord_mask, padding_mask, confidence), (local_representations, global_representations)
 
     def forward(self, inputs):
         coords, coord_mask, padding_mask, confidence = inputs

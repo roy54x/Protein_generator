@@ -43,7 +43,7 @@ class CoordsToLatentSpace(Base):
 
         pretrained_model_generator, self.protein_bert_tokenizer = load_pretrained_model()
         self.protein_bert_model = get_model_with_hidden_layers_as_outputs(
-            pretrained_model_generator.create_model(MAX_TRAINING_SIZE))
+            pretrained_model_generator.create_model(MAX_TRAINING_SIZE + 2))
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
         batch_converter_input = []
@@ -51,17 +51,17 @@ class CoordsToLatentSpace(Base):
 
         for data in batch_data:
             sequence = data['sequence']
-            sequence_padded = sequence + self.padding_token * (MAX_TRAINING_SIZE - len(sequence) - 2)
+            sequence_padded = sequence + self.padding_token * (MAX_TRAINING_SIZE - len(sequence))
             coords = [[[float('inf') if x is None else x for x in atom]
                        for atom in residue] for residue in data['coords']]
             coords_padded = (coords + [[[np.nan] * len(coords[0][0])] * len(coords[0])]
-                             * (MAX_TRAINING_SIZE - len(sequence) - 2))
+                             * (MAX_TRAINING_SIZE - len(sequence)))
             batch_sequences.append(sequence)
             batch_converter_input.append((coords_padded, None, sequence_padded))
 
         coords, confidence, strs, tokens, padding_mask = self.batch_converter(batch_converter_input, device=self.device)
 
-        encoded_x = self.protein_bert_tokenizer.encode_X(batch_sequences, MAX_TRAINING_SIZE)
+        encoded_x = self.protein_bert_tokenizer.encode_X(batch_sequences, MAX_TRAINING_SIZE + 2)
         local_representations, global_representations = self.protein_bert_model.predict(encoded_x, batch_size=1)
 
         return (coords, padding_mask, confidence), torch.tensor(local_representations)

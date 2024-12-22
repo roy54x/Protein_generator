@@ -1,3 +1,5 @@
+import argparse
+
 import esm
 import torch
 import torch.nn.functional as F
@@ -15,10 +17,12 @@ class CoordsToLatentSpace(Base):
 
     def __init__(self):
         super(CoordsToLatentSpace, self).__init__()
-        self.model, self.alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
+        self.pretrained_model, self.alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
 
-        self.args = self.model.args
-        self.args.top_k_neighbors = 30
+        self.args = argparse.Namespace()
+        for k, v in vars(self.pretrained_model.args).items():
+            if k.startswith("gvp_"):
+                setattr(self.args, k[4:], v)
         self.args.max_tokens = MAX_TRAINING_SIZE
 
         self.gvp_encoder = GVPEncoder(self.args)

@@ -35,12 +35,12 @@ class CoordsToLatentSpace(Base):
 
         for data in batch_data:
             sequence = data['sequence']
-            coords = data['coords']
+            coords = [[[float('inf') if x is None else x for x in atom]
+                       for atom in residue] for residue in data['coords']]
             batch_sequences.append(data['sequence'])
             batch_converter_input.append((coords, None, sequence))
 
-        coords, _, _, _, _ = self.batch_converter(
-            batch_converter_input, device=self.device)
+        coords, _, _, _, _ = self.batch_converter(batch_converter_input, device=self.device)
 
         pretrained_model_generator, input_encoder = load_pretrained_model()
         model = get_model_with_hidden_layers_as_outputs(pretrained_model_generator.create_model(MAX_TRAINING_SIZE))

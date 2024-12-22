@@ -65,8 +65,8 @@ class CoordsToSequence(Base):
         coords = data["coords"]
         chain_id = data["chain_id"]
 
-        coords = [[[float('inf') if x is None else x for x in coordinates]
-                   for coordinates in atom] for atom in coords]
+        coords = [[[float('inf') if x is None else x for x in atom]
+                   for atom in residue] for residue in coords]
 
         # Get the predicted sequence from the model
         predicted_sequence = self.gvp_transformer.sample(coords, temperature=1e-6)

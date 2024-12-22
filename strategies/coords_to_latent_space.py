@@ -25,6 +25,10 @@ class CoordsToLatentSpace(Base):
                 setattr(self.args, k[4:], v)
         self.args.max_tokens = MAX_TRAINING_SIZE
 
+        pretrained_model_generator, self.protein_bert_tokenizer = load_pretrained_model()
+        self.protein_bert_model = get_model_with_hidden_layers_as_outputs(
+            pretrained_model_generator.create_model(MAX_TRAINING_SIZE))
+
         self.gvp_encoder = GVPEncoder(self.args)
         self.batch_converter = CoordBatchConverter(self.alphabet)
         self.device = next(self.gvp_encoder.parameters()).device
@@ -42,10 +46,8 @@ class CoordsToLatentSpace(Base):
 
         coords, _, _, _, _ = self.batch_converter(batch_converter_input, device=self.device)
 
-        pretrained_model_generator, input_encoder = load_pretrained_model()
-        model = get_model_with_hidden_layers_as_outputs(pretrained_model_generator.create_model(MAX_TRAINING_SIZE))
-        encoded_x = input_encoder.encode_X(batch_sequences, MAX_TRAINING_SIZE)
-        local_representations, global_representations = model.predict(encoded_x, batch_size=1)
+        encoded_x = self.protein_bert_tokenizer.encode_X(batch_sequences, MAX_TRAINING_SIZE)
+        local_representations, global_representations = self.protein_bert_model.predict(encoded_x, batch_size=1)
 
         return (coords, None, None, None), (local_representations, global_representations)
 

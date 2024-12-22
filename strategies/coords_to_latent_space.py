@@ -10,9 +10,9 @@ from esm.inverse_folding.gvp_transformer_encoder import GVPTransformerEncoder
 from esm.inverse_folding.util import CoordBatchConverter
 from proteinbert import load_pretrained_model
 from proteinbert.conv_and_global_attention_model import get_model_with_hidden_layers_as_outputs
-from torch import nan_to_num
+from torch import nan_to_num, nn
 
-from constants import MAX_TRAINING_SIZE, MIN_SIZE
+from constants import MAX_TRAINING_SIZE, MIN_SIZE, BATCH_SIZE
 from strategies.base import Base
 
 
@@ -45,6 +45,8 @@ class CoordsToLatentSpace(Base):
         self.protein_bert_model = get_model_with_hidden_layers_as_outputs(
             pretrained_model_generator.create_model(MAX_TRAINING_SIZE + 2))
 
+        self.loss_fn = nn.CosineEmbeddingLoss(reduction="sum")
+
     def load_inputs_and_ground_truth(self, batch_data, end=None):
         batch_converter_input = []
         batch_sequences = []
@@ -72,9 +74,9 @@ class CoordsToLatentSpace(Base):
         return encoder_out["encoder_out"][0].transpose(0, 1)
 
     def compute_loss(self, outputs, ground_truth):
-        outputs = outputs.reshape(-1, outputs.size(-1))  # Shape: (8 * 250, 1562)
-        ground_truth = ground_truth.reshape(-1, ground_truth.size(-1))  # Shape: (8 * 250, 1562)
-        target = torch.ones(outputs.size(0), device=outputs.device)  # Shape: (8 * 250,)
+        outputs = outputs.reshape(-1, outputs.size(-1))
+        ground_truth = ground_truth.reshape(-1, ground_truth.size(-1))
+        target = torch.ones(outputs.size(0), device=outputs.device)
         return F.cosine_embedding_loss(outputs, ground_truth, target)
 
     def evaluate(self, data):

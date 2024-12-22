@@ -26,19 +26,28 @@ class CoordsToLatentSpace(Base):
         self.args.max_tokens = MAX_TRAINING_SIZE
 
         self.gvp_encoder = GVPEncoder(self.args)
+        self.batch_converter = CoordBatchConverter(self.alphabet)
         self.device = next(self.gvp_encoder.parameters()).device
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
-        batch_sequences = [data['sequence'] for data in batch_data]
-        batch_coords = [data['coords'] for data in batch_data]
-        input_coords = torch.cat(batch_coords, dim=0)
+        batch_converter_input = []
+        batch_sequences = []
+
+        for data in batch_data:
+            sequence = data['sequence']
+            coords = data['coords']
+            batch_sequences.append(data['sequence'])
+            batch_converter_input.append((coords, None, sequence))
+
+        coords, _, _, _, _ = self.batch_converter(
+            batch_converter_input, device=self.device)
 
         pretrained_model_generator, input_encoder = load_pretrained_model()
         model = get_model_with_hidden_layers_as_outputs(pretrained_model_generator.create_model(MAX_TRAINING_SIZE))
         encoded_x = input_encoder.encode_X(batch_sequences, MAX_TRAINING_SIZE)
         local_representations, global_representations = model.predict(encoded_x, batch_size=1)
 
-        return (input_coords, None, None, None), (local_representations, global_representations)
+        return (coords, None, None, None), (local_representations, global_representations)
 
     def forward(self, inputs):
         coords, coord_mask, padding_mask, confidence = inputs

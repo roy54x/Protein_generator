@@ -1,16 +1,12 @@
-import argparse
-
 import esm
 import numpy as np
 import torch
 import torch.nn.functional as F
-from esm.inverse_folding.gvp_encoder import GVPEncoder
-from esm.inverse_folding.gvp_transformer import GVPTransformerModel
 from esm.inverse_folding.gvp_transformer_encoder import GVPTransformerEncoder
 from esm.inverse_folding.util import CoordBatchConverter
 from proteinbert import load_pretrained_model
 from proteinbert.conv_and_global_attention_model import get_model_with_hidden_layers_as_outputs
-from torch import nan_to_num, nn
+from torch import nn
 
 from constants import MAX_TRAINING_SIZE, MIN_SIZE, BATCH_SIZE
 from strategies.base import Base
@@ -64,7 +60,7 @@ class CoordsToLatentSpace(Base):
         coords, confidence, strs, tokens, padding_mask = self.batch_converter(batch_converter_input, device=self.device)
 
         encoded_x = self.protein_bert_tokenizer.encode_X(batch_sequences, MAX_TRAINING_SIZE + 2)
-        local_representations, global_representations = self.protein_bert_model.predict(encoded_x, batch_size=1)
+        local_representations, global_representations = self.protein_bert_model.predict(encoded_x, batch_size=BATCH_SIZE)
 
         return (coords, padding_mask, confidence), torch.tensor(local_representations)
 
@@ -81,9 +77,22 @@ class CoordsToLatentSpace(Base):
 
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]
-        partial_seq = ground_truth_sequence[:MIN_SIZE+1]
-        coords = data["coords"]
-        predicted_sequence = self.gvp_transformer.sample(coords, partial_seq=partial_seq)
+        chain_id = data["chain_id"]
+        inputs, gt_representations = self.load_inputs_and_ground_truth([data])
 
-        for idx in range(0, len(ground_truth_sequence)):
-            print("real values: " + str(ground_truth_sequence[idx]) + ", predicted values: " + str(predicted_sequence[idx]))
+        # Get the predicted representation from the model
+        predicted_representations = self(inputs)
+        loss = self.compute_loss(predicted_representations, gt_representations).item()
+        print(f"Distance in Embedding space is: {loss}")
+
+        # Get the predicted sequence based on the decoder
+        predicted_sequence = self.protein_bert_model
+
+        # Compare ground truth and predicted sequence directly using vectorized operations
+        correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))
+        total_predictions = len(ground_truth_sequence)
+
+        # Calculate and print the average recovery rate
+        recovery_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
+        print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
+        return recovery_rate

@@ -4,15 +4,16 @@ import os.path
 import pandas as pd
 import torch
 
-from constants import MAIN_DIR
+from constants import MAIN_DIR, PRETRAINED_MODEL_PATH
 from strategies.contact_map_to_sequence import ContactMapToSequence
+from strategies.coords_to_latent_space import CoordsToLatentSpace
 from strategies.coords_to_sequence import CoordsToSequence
 from strategies.sequence_to_distogram import SequenceToDistogram
 
 if __name__ == '__main__':
-    strategy = CoordsToSequence()
+    strategy = CoordsToLatentSpace()
 
-    model_path = os.path.join(MAIN_DIR, r"models\CoordsToSequence\20241128\best_model.pth")
+    model_path = os.path.join(MAIN_DIR, PRETRAINED_MODEL_PATH)
     state_dict = torch.load(model_path)
     strategy.load_state_dict(state_dict)
     strategy.eval()

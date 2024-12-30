@@ -16,36 +16,36 @@ class CoordsToLatentSpace(Base):
 
     def __init__(self):
         super(CoordsToLatentSpace, self).__init__()
-        self.pretrained_model, alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
+        self.pretrained_llm, llm_alphabet = esm.pretrained.esm2_t30_150M_UR50D()
+        self.pretrained_llm.eval().cuda()
+        self.batch_converter = llm_alphabet.get_batch_converter()
+        self.device = next(self.pretrained_llm.parameters()).device
 
-        args = self.pretrained_model.args
-        args.encoder_embed_dim = 1562
+        self.pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
+
+        args = self.pretrained_inverse_model.args
+        args.encoder_embed_dim = 640
         args.encoder_ffn_embed_dim = 256
         args.encoder_layers = 4
-        args.encoder_attention_heads = 11
+        args.encoder_attention_heads = 8
         args.gvp_node_hidden_dim_scalar = 128
         args.gvp_node_hidden_dim_vector = 32
         args.gvp_edge_hidden_dim_scalar = 4
         args.max_tokens = MAX_TRAINING_SIZE
 
-        encoder_embed_tokens = self.pretrained_model.build_embedding(
-            args, alphabet, args.encoder_embed_dim,
+        encoder_embed_tokens = self.pretrained_inverse_model.build_embedding(
+            args, inverse_alphabet, args.encoder_embed_dim,
         )
+        self.gvp_transformer_encoder = GVPTransformerEncoder(args, inverse_alphabet, encoder_embed_tokens)
+        self.inverse_batch_converter = CoordBatchConverter(inverse_alphabet)
 
-        self.gvp_transformer_encoder = GVPTransformerEncoder(args, alphabet, encoder_embed_tokens)
-        self.batch_converter = CoordBatchConverter(alphabet)
-        self.device = next(self.gvp_transformer_encoder.parameters()).device
-        self.padding_token = alphabet.all_toks[alphabet.padding_idx]
-
-        pretrained_model_generator, self.protein_bert_tokenizer = load_pretrained_model()
-        self.protein_bert_model = get_model_with_hidden_layers_as_outputs(
-            pretrained_model_generator.create_model(MAX_TRAINING_SIZE + 2))
+        self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
 
         self.loss_fn = nn.CosineEmbeddingLoss(reduction="sum")
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
+        inverse_batch_converter_input = []
         batch_converter_input = []
-        batch_sequences = []
 
         for data in batch_data:
             sequence = data['sequence']
@@ -54,15 +54,18 @@ class CoordsToLatentSpace(Base):
                        for atom in residue] for residue in data['coords']]
             coords_padded = (coords + [[[np.nan] * len(coords[0][0])] * len(coords[0])]
                              * (MAX_TRAINING_SIZE - len(sequence)))
-            batch_sequences.append(sequence)
-            batch_converter_input.append((coords_padded, None, sequence_padded))
+            batch_converter_input.append((data['chain_id'], sequence_padded))
+            inverse_batch_converter_input.append((coords_padded, None, sequence_padded))
 
-        coords, confidence, strs, tokens, padding_mask = self.batch_converter(batch_converter_input, device=self.device)
+        batch_labels, batch_strs, batch_tokens = self.batch_converter(batch_converter_input)
+        batch_tokens = batch_tokens.to(self.device)
+        result = self.pretrained_llm(batch_tokens, repr_layers=[30])
+        representations = result["representations"][30]
 
-        encoded_x = self.protein_bert_tokenizer.encode_X(batch_sequences, MAX_TRAINING_SIZE + 2)
-        local_representations, global_representations = self.protein_bert_model.predict(encoded_x, batch_size=BATCH_SIZE)
+        coords, confidence, strs, tokens, padding_mask = self.inverse_batch_converter(
+            inverse_batch_converter_input, device=self.device)
 
-        return (coords, padding_mask, confidence), torch.tensor(local_representations)
+        return (coords, padding_mask, confidence), representations
 
     def forward(self, inputs):
         coords, padding_mask, confidence = inputs

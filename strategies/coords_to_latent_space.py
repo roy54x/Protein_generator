@@ -49,13 +49,10 @@ class CoordsToLatentSpace(Base):
 
         for data in batch_data:
             sequence = data['sequence']
-            sequence_padded = sequence + self.padding_token * (MAX_TRAINING_SIZE - len(sequence))
             coords = [[[float('inf') if x is None else x for x in atom]
                        for atom in residue] for residue in data['coords']]
-            coords_padded = (coords + [[[np.nan] * len(coords[0][0])] * len(coords[0])]
-                             * (MAX_TRAINING_SIZE - len(sequence)))
-            batch_converter_input.append((data['chain_id'], sequence_padded))
-            inverse_batch_converter_input.append((coords_padded, None, sequence_padded))
+            batch_converter_input.append((data['chain_id'], sequence))
+            inverse_batch_converter_input.append((coords, None, sequence))
 
         batch_labels, batch_strs, batch_tokens = self.batch_converter(batch_converter_input)
         batch_tokens = batch_tokens.to(self.device)

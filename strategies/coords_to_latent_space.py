@@ -89,7 +89,9 @@ class CoordsToLatentSpace(Base):
         print(f"Distance in Embedding space is: {loss}")
 
         # Get the predicted sequence based on the decoder
-        predicted_sequence = self.protein_bert_model
+        predicted_logits = self.pretrained_llm.lm_head(predicted_representations)
+        predicted_indices = torch.argmax(predicted_logits, dim=-1)
+        predicted_sequence = ''.join([self.alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
 
         # Compare ground truth and predicted sequence directly using vectorized operations
         correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))

@@ -16,9 +16,9 @@ class CoordsToLatentSpace(Base):
 
     def __init__(self):
         super(CoordsToLatentSpace, self).__init__()
-        self.pretrained_llm, llm_alphabet = esm.pretrained.esm2_t30_150M_UR50D()
+        self.pretrained_llm, self.llm_alphabet = esm.pretrained.esm2_t30_150M_UR50D()
         self.pretrained_llm.eval().cuda()
-        self.batch_converter = llm_alphabet.get_batch_converter()
+        self.batch_converter = self.llm_alphabet.get_batch_converter()
         self.device = next(self.pretrained_llm.parameters()).device
 
         self.pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
@@ -84,6 +84,7 @@ class CoordsToLatentSpace(Base):
         inputs, gt_representations = self.load_inputs_and_ground_truth([data])
 
         # Get the predicted representation from the model
+        self.gvp_transformer_encoder.to(self.device)
         predicted_representations = self(inputs)
         loss = self.compute_loss(predicted_representations, gt_representations).item()
         print(f"Distance in Embedding space is: {loss}")
@@ -91,7 +92,7 @@ class CoordsToLatentSpace(Base):
         # Get the predicted sequence based on the decoder
         predicted_logits = self.pretrained_llm.lm_head(predicted_representations)
         predicted_indices = torch.argmax(predicted_logits, dim=-1)
-        predicted_sequence = ''.join([self.alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
+        predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
 
         # Compare ground truth and predicted sequence directly using vectorized operations
         correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))

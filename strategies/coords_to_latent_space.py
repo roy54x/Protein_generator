@@ -100,3 +100,6 @@ class CoordsToLatentSpace(Base):
         recovery_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
         print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
         return recovery_rate
+
+    def get_parameter_count(self):
+        return sum(p.numel() for p in self.gvp_transformer_encoder.parameters() if p.requires_grad)

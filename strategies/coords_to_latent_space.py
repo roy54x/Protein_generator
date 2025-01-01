@@ -16,7 +16,7 @@ class CoordsToLatentSpace(Base):
 
     def __init__(self):
         super(CoordsToLatentSpace, self).__init__()
-        self.pretrained_llm, self.llm_alphabet = esm.pretrained.esm2_t30_150M_UR50D()
+        self.pretrained_llm, self.llm_alphabet = esm.pretrained.esm2_t33_650M_UR50D()
         self.pretrained_llm.eval().cuda()
         self.batch_converter = self.llm_alphabet.get_batch_converter()
         self.device = next(self.pretrained_llm.parameters()).device
@@ -56,8 +56,8 @@ class CoordsToLatentSpace(Base):
 
         batch_labels, batch_strs, batch_tokens = self.batch_converter(batch_converter_input)
         batch_tokens = batch_tokens.to(self.device)
-        result = self.pretrained_llm(batch_tokens, repr_layers=[30])
-        representations = result["representations"][30]
+        result = self.pretrained_llm(batch_tokens, repr_layers=[33])
+        representations = result["representations"][33]
 
         coords, confidence, strs, tokens, padding_mask = self.inverse_batch_converter(
             inverse_batch_converter_input, device=self.device)

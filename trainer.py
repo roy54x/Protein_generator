@@ -57,11 +57,10 @@ class Trainer:
         self.test_size = len(self.test_files) * NUM_SAMPLES_IN_DATAFRAME
         print(f"number of samples in the train set are: {self.train_size}")
         print(f"number of samples in the test set are: {self.test_size}")
-        print(f'Number of trainable parameters: '
-              f'{sum(p.numel() for p in self.strategy.parameters() if p.requires_grad)}')
+        print(f'Number of trainable parameters: {self.strategy.get_parameter_count()}')
 
     def get_dataloader(self, file_path, mode):
-        dataframe = pd.read_json(file_path, lines=True)
+        dataframe = pd.read_json(file_path)
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) >= MIN_SIZE)]
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) <= MAX_SIZE)]
         dataframe = dataframe[dataframe['sequence'].apply(lambda seq: all(char in AMINO_ACIDS for char in seq))]

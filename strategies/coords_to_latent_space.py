@@ -24,15 +24,9 @@ class CoordsToLatentSpace(Base):
 
         args = self.pretrained_inverse_model.args
         args.encoder_embed_dim = 1280
-        args.decoder_embed_dim = 0
-        args.decoder_input_dim = 0
-        args.decoder_output_dim = 0
         args.encoder_ffn_embed_dim = 256
-        args.decoder_ffn_embed_dim = 0
         args.encoder_layers = 4
-        args.decoder_layers = 0
         args.encoder_attention_heads = 4
-        args.decoder_attention_heads = 0
         args.gvp_node_hidden_dim_scalar = 128
         args.gvp_node_hidden_dim_vector = 32
         args.gvp_edge_hidden_dim_scalar = 4

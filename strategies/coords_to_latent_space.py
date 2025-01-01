@@ -17,17 +17,22 @@ class CoordsToLatentSpace(Base):
     def __init__(self):
         super(CoordsToLatentSpace, self).__init__()
         self.pretrained_llm, self.llm_alphabet = esm.pretrained.esm2_t33_650M_UR50D()
-        self.pretrained_llm.eval().cuda()
+        self.pretrained_llm.eval()
         self.batch_converter = self.llm_alphabet.get_batch_converter()
-        self.device = next(self.pretrained_llm.parameters()).device
 
         self.pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
 
         args = self.pretrained_inverse_model.args
-        args.encoder_embed_dim = 640
+        args.encoder_embed_dim = 1280
+        args.decoder_embed_dim = 0
+        args.decoder_input_dim = 0
+        args.decoder_output_dim = 0
         args.encoder_ffn_embed_dim = 256
+        args.decoder_ffn_embed_dim = 0
         args.encoder_layers = 4
-        args.encoder_attention_heads = 8
+        args.decoder_layers = 0
+        args.encoder_attention_heads = 4
+        args.decoder_attention_heads = 0
         args.gvp_node_hidden_dim_scalar = 128
         args.gvp_node_hidden_dim_vector = 32
         args.gvp_edge_hidden_dim_scalar = 4
@@ -42,6 +47,7 @@ class CoordsToLatentSpace(Base):
         self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
 
         self.loss_fn = nn.CosineEmbeddingLoss(reduction="sum")
+        self.device = "cuda:0"
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
         inverse_batch_converter_input = []
@@ -55,7 +61,8 @@ class CoordsToLatentSpace(Base):
             inverse_batch_converter_input.append((coords, None, sequence))
 
         batch_labels, batch_strs, batch_tokens = self.batch_converter(batch_converter_input)
-        batch_tokens = batch_tokens.to(self.device)
+        batch_tokens = batch_tokens.to("cpu")
+        self.pretrained_llm = self.pretrained_llm.to("cpu")
         result = self.pretrained_llm(batch_tokens, repr_layers=[33])
         representations = result["representations"][33]
 

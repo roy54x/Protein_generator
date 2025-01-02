@@ -41,7 +41,7 @@ if __name__ == '__main__':
     print(f"Filtered {len(cath_df) - len(valid_cath_df)} rows with sequences longer than {MAX_TRAINING_SIZE}.")
 
     # Split into train and test sets
-    train_cath_df = valid_cath_df[valid_cath_df["dataset"] == "train"]
+    train_cath_df = valid_cath_df[valid_cath_df["dataset"] != "test"]
     test_cath_df = valid_cath_df[valid_cath_df["dataset"] == "test"]
 
     # Prepare and process in batches for train and test
@@ -69,7 +69,8 @@ if __name__ == '__main__':
                 output_file = os.path.join(cath_path, dataset_name + "_set",
                                            f"cath_df_{i // NUM_SAMPLES_IN_DATAFRAME}.json")
                 chunk_df.to_json(output_file, orient="records", indent=4)
-                print(f"Saved chunk {i // NUM_SAMPLES_IN_DATAFRAME} for {dataset_name} set to {output_file}")
+                print(f"Saved chunk {i // NUM_SAMPLES_IN_DATAFRAME} "
+                      f"for {dataset_name} set to {output_file}")
                 chunk_data = []
 
         # Save any remaining data in chunk_data that didn't reach full chunk size

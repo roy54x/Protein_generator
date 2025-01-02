@@ -34,7 +34,7 @@ class CoordsToLatentSpace(Base):
 
         self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
 
-        self.loss_fn = nn.CosineEmbeddingLoss(reduction="sum")
+        self.loss_fn = nn.CosineEmbeddingLoss()
         self.device = "cuda:0"
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
@@ -70,13 +70,21 @@ class CoordsToLatentSpace(Base):
     def forward(self, inputs):
         coords, padding_mask, confidence = inputs
         encoder_out = self.gvp_transformer_encoder(coords, padding_mask, confidence)
-        return encoder_out["encoder_out"][0].transpose(0, 1)
+        return encoder_out["encoder_out"][0].transpose(0, 1), padding_mask
 
     def compute_loss(self, outputs, ground_truth):
-        outputs = outputs.reshape(-1, outputs.size(-1))
+        prediction, padding_mask = outputs
+        prediction = prediction.reshape(-1, prediction.size(-1))
         ground_truth = ground_truth.reshape(-1, ground_truth.size(-1))
-        target = torch.ones(outputs.size(0), device=outputs.device)
-        return F.cosine_embedding_loss(outputs, ground_truth, target)
+        padding_mask = padding_mask.reshape(-1)
+
+        # Filter prediction and ground_truth based on non-padded tokens
+        prediction = prediction[~padding_mask]
+        ground_truth = ground_truth[~padding_mask]
+
+        target = torch.ones(prediction.size(0), device=prediction.device)
+        loss = F.cosine_embedding_loss(prediction, ground_truth, target)
+        return loss
 
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]

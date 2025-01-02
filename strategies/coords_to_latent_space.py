@@ -4,11 +4,9 @@ import torch
 import torch.nn.functional as F
 from esm.inverse_folding.gvp_transformer_encoder import GVPTransformerEncoder
 from esm.inverse_folding.util import CoordBatchConverter
-from proteinbert import load_pretrained_model
-from proteinbert.conv_and_global_attention_model import get_model_with_hidden_layers_as_outputs
 from torch import nn
 
-from constants import MAX_TRAINING_SIZE, MIN_SIZE, BATCH_SIZE
+from constants import MAX_TRAINING_SIZE
 from strategies.base import Base
 
 
@@ -16,10 +14,6 @@ class CoordsToLatentSpace(Base):
 
     def __init__(self):
         super(CoordsToLatentSpace, self).__init__()
-        self.pretrained_llm, self.llm_alphabet = esm.pretrained.esm2_t33_650M_UR50D()
-        self.pretrained_llm.eval()
-        self.batch_converter = self.llm_alphabet.get_batch_converter()
-
         self.pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
 
         args = self.pretrained_inverse_model.args
@@ -38,27 +32,30 @@ class CoordsToLatentSpace(Base):
         self.gvp_transformer_encoder = GVPTransformerEncoder(args, inverse_alphabet, encoder_embed_tokens)
         self.inverse_batch_converter = CoordBatchConverter(inverse_alphabet)
 
-        self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
-
         self.loss_fn = nn.CosineEmbeddingLoss(reduction="sum")
         self.device = "cuda:0"
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
         inverse_batch_converter_input = []
-        batch_converter_input = []
+        representations = []
 
         for data in batch_data:
             sequence = data['sequence']
+            sequence_padded = sequence + self.padding_token * (MAX_TRAINING_SIZE - len(sequence))
             coords = [[[float('inf') if x is None else x for x in atom]
                        for atom in residue] for residue in data['coords']]
-            batch_converter_input.append((data['chain_id'], sequence))
-            inverse_batch_converter_input.append((coords, None, sequence))
+            coords_padded = (coords + [[[np.nan] * len(coords[0][0])] * len(coords[0])]
+                             * (MAX_TRAINING_SIZE - len(sequence)))
+            inverse_batch_converter_input.append((coords_padded, None, sequence_padded))
 
-        batch_labels, batch_strs, batch_tokens = self.batch_converter(batch_converter_input)
-        batch_tokens = batch_tokens.to("cpu")
-        self.pretrained_llm = self.pretrained_llm.to("cpu")
-        result = self.pretrained_llm(batch_tokens, repr_layers=[33])
-        representations = result["representations"][33]
+            representation = data['representations']
+            representation_padded = np.pad(
+                representation,
+                ((0, MAX_TRAINING_SIZE - len(representation)), (0, 0)),
+                mode='constant',
+                constant_values=0
+            )
+            representations.append(torch.tensor(representation_padded))
 
         coords, confidence, strs, tokens, padding_mask = self.inverse_batch_converter(
             inverse_batch_converter_input, device=self.device)

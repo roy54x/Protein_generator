@@ -38,11 +38,16 @@ if __name__ == '__main__':
     # Prepare and process in batches
     representations_list = []
     predicted_sequences_list = []
+    total_rows = len(valid_cath_df)
 
     for i, row in valid_cath_df.iterrows():
         representation, predicted_sequence = esm_generator.get_representations(row)
         representations_list.append(representation.cpu().detach().numpy())
         predicted_sequences_list.append(predicted_sequence)
+
+        # Print progress every 10 rows
+        if i % 10 == 0 or i == total_rows:
+            print(f"Processed {i}/{total_rows} rows ({(i / total_rows) * 100:.2f}%).")
 
     # Add results to the dataframe
     valid_cath_df["representations"] = representations_list

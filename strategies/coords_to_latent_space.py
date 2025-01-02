@@ -34,7 +34,7 @@ class CoordsToLatentSpace(Base):
 
         self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
 
-        self.loss_fn = nn.CosineEmbeddingLoss()
+        self.loss_fn = nn.CosineEmbeddingLoss(reduction="sum")
         self.device = "cuda:0"
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
@@ -76,11 +76,6 @@ class CoordsToLatentSpace(Base):
         prediction, padding_mask = outputs
         prediction = prediction.reshape(-1, prediction.size(-1))
         ground_truth = ground_truth.reshape(-1, ground_truth.size(-1))
-        padding_mask = padding_mask.reshape(-1)
-
-        # Filter prediction and ground_truth based on non-padded tokens
-        prediction = prediction[~padding_mask]
-        ground_truth = ground_truth[~padding_mask]
 
         target = torch.ones(prediction.size(0), device=prediction.device)
         loss = F.cosine_embedding_loss(prediction, ground_truth, target)

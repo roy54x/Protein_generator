@@ -30,8 +30,12 @@ class ESMRepresentationGenerator:
 if __name__ == '__main__':
     esm_generator = ESMRepresentationGenerator()
 
+    cath_path = os.path.join(MAIN_DIR, "cath_data")
+    os.makedirs(os.path.join(cath_path, "train_set"), exist_ok=True)
+    os.makedirs(os.path.join(cath_path, "test_set"), exist_ok=True)
+
     # Load the CATH dataset
-    cath_json_file = os.path.join(MAIN_DIR, "cath_data", "cath_data.json")
+    cath_json_file = os.path.join(cath_path, "cath_data.json")
     cath_df = pd.read_json(cath_json_file)
     valid_cath_df = cath_df[cath_df['sequence'].str.len() <= MAX_TRAINING_SIZE].copy()
     print(f"Filtered {len(cath_df) - len(valid_cath_df)} rows with sequences longer than {MAX_TRAINING_SIZE}.")
@@ -62,7 +66,7 @@ if __name__ == '__main__':
             # Save the chunk if it reaches the specified chunk size
             if len(chunk_data) >= NUM_SAMPLES_IN_DATAFRAME:
                 chunk_df = pd.DataFrame(chunk_data)
-                output_file = os.path.join(MAIN_DIR, "cath_data", dataset_name + "_set",
+                output_file = os.path.join(cath_path, dataset_name + "_set",
                                            f"cath_df_{i // NUM_SAMPLES_IN_DATAFRAME}.json")
                 chunk_df.to_json(output_file, orient="records", indent=4)
                 print(f"Saved chunk {i // NUM_SAMPLES_IN_DATAFRAME} for {dataset_name} set to {output_file}")
@@ -71,7 +75,7 @@ if __name__ == '__main__':
         # Save any remaining data in chunk_data that didn't reach full chunk size
         if chunk_data:
             chunk_df = pd.DataFrame(chunk_data)
-            output_file = os.path.join(MAIN_DIR, "cath_data", dataset_name + "_set",
+            output_file = os.path.join(cath_path, dataset_name + "_set",
                                        f"cath_df_{len(dataset_df) // NUM_SAMPLES_IN_DATAFRAME}.json")
             chunk_df.to_json(output_file, orient="records", indent=4)
             print(f"Saved final chunk for {dataset_name} set to {output_file}")

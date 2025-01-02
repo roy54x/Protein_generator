@@ -32,6 +32,8 @@ class CoordsToLatentSpace(Base):
         self.gvp_transformer_encoder = GVPTransformerEncoder(args, inverse_alphabet, encoder_embed_tokens)
         self.inverse_batch_converter = CoordBatchConverter(inverse_alphabet)
 
+        self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
+
         self.loss_fn = nn.CosineEmbeddingLoss(reduction="sum")
         self.device = "cuda:0"
 
@@ -41,26 +43,29 @@ class CoordsToLatentSpace(Base):
 
         for data in batch_data:
             sequence = data['sequence']
-            sequence_padded = sequence + self.padding_token * (MAX_TRAINING_SIZE - len(sequence))
+            padding_size = MAX_TRAINING_SIZE - len(sequence)
+
+            sequence_padded = sequence + self.padding_token * padding_size
             coords = [[[float('inf') if x is None else x for x in atom]
                        for atom in residue] for residue in data['coords']]
-            coords_padded = (coords + [[[np.nan] * len(coords[0][0])] * len(coords[0])]
-                             * (MAX_TRAINING_SIZE - len(sequence)))
+            coords_padded = (coords + [[[np.nan] * len(coords[0][0])]
+                                       * len(coords[0])] * padding_size)
             inverse_batch_converter_input.append((coords_padded, None, sequence_padded))
 
-            representation = data['representations']
-            representation_padded = np.pad(
-                representation,
-                ((0, MAX_TRAINING_SIZE - len(representation)), (0, 0)),
-                mode='constant',
-                constant_values=0
-            )
-            representations.append(torch.tensor(representation_padded))
+            representation = torch.tensor(data['representations'])
+            representation_padded = torch.nn.functional.pad(
+                representation[:-1],
+                (0, 0, 0, padding_size),
+                mode="constant", value=0)
+            representation_padded = torch.concat([representation_padded,
+                                                  torch.unsqueeze(representation[-1],
+                                                                  0)], 0)
+            representations.append(representation_padded)
 
         coords, confidence, strs, tokens, padding_mask = self.inverse_batch_converter(
             inverse_batch_converter_input, device=self.device)
 
-        return (coords, padding_mask, confidence), representations
+        return (coords, padding_mask, confidence), torch.stack(representations, 0)
 
     def forward(self, inputs):
         coords, padding_mask, confidence = inputs
@@ -85,9 +90,9 @@ class CoordsToLatentSpace(Base):
         print(f"Distance in Embedding space is: {loss}")
 
         # Get the predicted sequence based on the decoder
-        predicted_logits = self.pretrained_llm.lm_head(predicted_representations)
+        predicted_logits = self.pretrained_llm.lm_head(predicted_representations[:len(ground_truth_sequence)])
         predicted_indices = torch.argmax(predicted_logits, dim=-1)
-        predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
+        predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])[5:-5]
 
         # Compare ground truth and predicted sequence directly using vectorized operations
         correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))

@@ -1,9 +1,10 @@
 import os
+
 import esm
 import pandas as pd
 import torch
 
-from constants import MAIN_DIR, MAX_TRAINING_SIZE, BATCH_SIZE
+from constants import MAIN_DIR, MAX_TRAINING_SIZE, NUM_SAMPLES_IN_DATAFRAME
 
 
 class ESMRepresentationGenerator:
@@ -24,7 +25,7 @@ class ESMRepresentationGenerator:
         predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for
                                        i in indices[0].tolist()])
         return representations[0], predicted_sequence[5:-5]
-5
+
 
 if __name__ == '__main__':
     esm_generator = ESMRepresentationGenerator()
@@ -35,26 +36,44 @@ if __name__ == '__main__':
     valid_cath_df = cath_df[cath_df['sequence'].str.len() <= MAX_TRAINING_SIZE].copy()
     print(f"Filtered {len(cath_df) - len(valid_cath_df)} rows with sequences longer than {MAX_TRAINING_SIZE}.")
 
-    # Prepare and process in batches
-    representations_list = []
-    predicted_sequences_list = []
-    total_rows = len(valid_cath_df)
+    # Split into train and test sets
+    train_cath_df = valid_cath_df[valid_cath_df["dataset"] == "train"]
+    test_cath_df = valid_cath_df[valid_cath_df["dataset"] == "test"]
 
-    for i, row in valid_cath_df.iterrows():
-        representation, predicted_sequence = esm_generator.get_representations(row)
-        representations_list.append(representation.cpu().detach().numpy())
-        predicted_sequences_list.append(predicted_sequence)
+    # Prepare and process in batches for train and test
+    for dataset_name, dataset_df in [('train', train_cath_df), ('test', test_cath_df)]:
+        representations_list = []
+        predicted_sequences_list = []
 
-        # Print progress every 10 rows
-        if i % 10 == 0 or i == total_rows:
-            print(f"Processed {i}/{total_rows} rows ({(i / total_rows) * 100:.2f}%).")
+        chunk_data = []
 
-    # Add results to the dataframe
-    valid_cath_df["representations"] = representations_list
-    valid_cath_df["predicted_sequence"] = predicted_sequences_list
+        for i, (_, row) in enumerate(dataset_df.iterrows()):
+            # Process the row
+            representation, predicted_sequence = esm_generator.get_representations(row)
+            representations_list.append(representation.cpu().detach().numpy())
+            predicted_sequences_list.append(predicted_sequence)
 
-    # Save the updated dataframe to a JSON file
-    output_file = os.path.join(MAIN_DIR, "cath_data", "cath_with_representations.json")
-    valid_cath_df.to_json(output_file, orient="records", indent=4)
+            # Add processed row to chunk_data
+            row_data = row.copy()
+            row_data["representations"] = representations_list[-1]
+            row_data["predicted_sequence"] = predicted_sequences_list[-1]
+            chunk_data.append(row_data)
 
-    print(f"Updated data saved to {output_file}")
+            # Save the chunk if it reaches the specified chunk size
+            if len(chunk_data) >= NUM_SAMPLES_IN_DATAFRAME:
+                chunk_df = pd.DataFrame(chunk_data)
+                output_file = os.path.join(MAIN_DIR, "cath_data", dataset_name + "_set",
+                                           f"cath_df_{i // NUM_SAMPLES_IN_DATAFRAME}.json")
+                chunk_df.to_json(output_file, orient="records", indent=4)
+                print(f"Saved chunk {i // NUM_SAMPLES_IN_DATAFRAME} for {dataset_name} set to {output_file}")
+                chunk_data = []
+
+        # Save any remaining data in chunk_data that didn't reach full chunk size
+        if chunk_data:
+            chunk_df = pd.DataFrame(chunk_data)
+            output_file = os.path.join(MAIN_DIR, "cath_data", dataset_name + "_set",
+                                       f"cath_df_{len(dataset_df) // NUM_SAMPLES_IN_DATAFRAME}.json")
+            chunk_df.to_json(output_file, orient="records", indent=4)
+            print(f"Saved final chunk for {dataset_name} set to {output_file}")
+
+    print("Processing complete!")

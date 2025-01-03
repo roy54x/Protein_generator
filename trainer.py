@@ -44,19 +44,19 @@ class Trainer:
             self.pretrained_model_path = None
 
         self.batch_size = batch_size
-        self.test_size = val_size
+        self.val_size = val_size
         self.device = device
         self.optimizer = torch.optim.Adam(strategy.parameters(), lr=0.001)
-        self.best_test_loss = float('inf')
+        self.best_val_loss = float('inf')
 
         # Collect all file paths from the directory
         self.file_paths = [os.path.join(directory, fname) for fname in os.listdir(directory) if fname.endswith('.json')]
-        self.train_files, self.test_files = train_test_split(self.file_paths, test_size=val_size, random_state=42,
-                                                             shuffle=False)
+        self.train_files, self.val_files = train_test_split(self.file_paths, test_size=val_size, random_state=42,
+                                                            shuffle=False)
         self.train_size = len(self.train_files) * NUM_SAMPLES_IN_DATAFRAME
-        self.test_size = len(self.test_files) * NUM_SAMPLES_IN_DATAFRAME
+        self.val_size = len(self.val_files) * NUM_SAMPLES_IN_DATAFRAME
         print(f"number of samples in the train set are: {self.train_size}")
-        print(f"number of samples in the test set are: {self.test_size}")
+        print(f"number of samples in the val set are: {self.val_size}")
         print(f'Number of trainable parameters: {self.strategy.get_parameter_count()}')
 
     def get_dataloader(self, file_path, mode):
@@ -90,8 +90,8 @@ class Trainer:
                     total_train_samples += len(ground_truth)
                     batch_count += 1
 
-                    # Print every 100 batches
-                    if batch_count % 100 == 0:
+                    # Print every 10 batches
+                    if batch_count % 10 == 0:
                         avg_train_loss = total_train_loss / total_train_samples
                         elapsed_time = time.time() - start_time
                         print(f'Epoch {epoch + 1}, Batch {batch_count} of {self.train_size // self.batch_size}, '
@@ -101,27 +101,27 @@ class Trainer:
                         total_train_samples = 0
                         start_time = time.time()
 
-            # Evaluate on test data
+            # Evaluate on val data
             self.strategy.eval()
-            total_test_loss = 0
-            total_test_samples = 0
+            total_val_loss = 0
+            total_val_samples = 0
             with torch.no_grad():
 
-                for test_file in self.test_files:
-                    test_loader = self.get_dataloader(test_file, mode="test")
+                for val_file in self.val_files:
+                    val_loader = self.get_dataloader(val_file, mode="val")
 
-                    for inputs, ground_truth in test_loader:
+                    for inputs, ground_truth in val_loader:
                         outputs = self.strategy((x.to(self.device) for x in inputs))
                         loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
-                        total_test_loss += loss.item()
-                        total_test_samples += len(ground_truth)
+                        total_val_loss += loss.item()
+                        total_val_samples += len(ground_truth)
 
-            average_test_loss = total_test_loss / total_test_samples
-            print(f'Epoch {epoch + 1}, Test Loss: {average_test_loss:.4f}')
+            average_val_loss = total_val_loss / total_val_samples
+            print(f'Epoch {epoch + 1}, Test Loss: {average_val_loss:.4f}')
 
             # Save the model if the test loss is the best seen so far
-            if average_test_loss < self.best_test_loss:
-                self.best_test_loss = average_test_loss
+            if average_val_loss < self.best_val_loss:
+                self.best_val_loss = average_val_loss
                 self.save_model()
 
     def save_model(self):

@@ -91,14 +91,16 @@ class CoordsToLatentSpace(Base):
         # Get the predicted representation from the model
         gt_representations = gt_representations.to(self.device)
         self.gvp_transformer_encoder = self.gvp_transformer_encoder.to(self.device)
-        predicted_representations = self(inputs)
-        loss = self.compute_loss(predicted_representations, gt_representations).item()
+        outputs = self(inputs)
+        loss = self.compute_loss(outputs, gt_representations).item()
         print(f"Distance in Embedding space is: {loss}")
 
         # Get the predicted sequence based on the decoder
-        predicted_logits = self.lm_head(predicted_representations[:len(ground_truth_sequence)])
+        predicted_representations,padding_mask = outputs
+        self.lm_head = self.lm_head.to(self.device)
+        predicted_logits = self.lm_head(predicted_representations[:, 1:len(ground_truth_sequence)+1])
         predicted_indices = torch.argmax(predicted_logits, dim=-1)
-        predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])[5:-5]
+        predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
 
         # Compare ground truth and predicted sequence directly using vectorized operations
         correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))

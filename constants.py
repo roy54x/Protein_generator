@@ -1,5 +1,5 @@
 MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
-PRETRAINED_MODEL_PATH = r"models\CoordsToLatentSpace\20241231\best_model.pth"
+PRETRAINED_MODEL_PATH = r"models\CoordsToLatentSpace\20250105\best_model.pth"
 
 NUM_SAMPLES_IN_DATAFRAME = 100
 

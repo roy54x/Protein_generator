@@ -36,7 +36,7 @@ class CoordsToLatentSpace(Base):
 
         self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
 
-        self.loss_fn = nn.CosineEmbeddingLoss(reduction="sum")
+        self.loss_fn = nn.CosineEmbeddingLoss()
         self.device = "cuda:0"
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
@@ -78,9 +78,16 @@ class CoordsToLatentSpace(Base):
         prediction, padding_mask = outputs
         prediction = prediction.reshape(-1, prediction.size(-1))
         ground_truth = ground_truth.reshape(-1, ground_truth.size(-1))
+        padding_mask = padding_mask.reshape(-1)
 
-        target = torch.ones(prediction.size(0), device=prediction.device)
-        loss = F.cosine_embedding_loss(prediction, ground_truth, target)
+        filtered_prediction = prediction[~padding_mask]
+        filtered_ground_truth = ground_truth[~padding_mask]
+
+        # Create target tensor for cosine embedding loss
+        target = torch.ones(filtered_prediction.size(0), device=prediction.device)
+
+        # Compute the cosine embedding loss
+        loss = self.loss_fn(filtered_prediction, filtered_ground_truth, target)
         return loss
 
     def evaluate(self, data):
@@ -96,7 +103,7 @@ class CoordsToLatentSpace(Base):
         print(f"Distance in Embedding space is: {loss}")
 
         # Get the predicted sequence based on the decoder
-        predicted_representations,padding_mask = outputs
+        predicted_representations, padding_mask = outputs
         self.lm_head = self.lm_head.to(self.device)
         predicted_logits = self.lm_head(predicted_representations[:, 1:len(ground_truth_sequence)+1])
         predicted_indices = torch.argmax(predicted_logits, dim=-1)

@@ -27,6 +27,9 @@ class CoordsToLatentSpace(Base):
             in_dim = 128
             backbone_noise = 0.1
             dropout = 0.1
+            gvp = True
+            h_attend = False
+            drop_edge = 0
 
         args = Args()
         k_neighbors = 30
@@ -136,4 +139,4 @@ class CoordsToLatentSpace(Base):
         return recovery_rate
 
     def get_parameter_count(self):
-        return sum(p.numel() for p in self.gvp_transformer_encoder.parameters() if p.requires_grad)
+        return sum(p.numel() for p in self.inverse_model.parameters() if p.requires_grad)

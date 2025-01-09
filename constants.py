@@ -1,11 +1,9 @@
-MAIN_DIR = r"D:\python project\data\Proteins"
+MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
 PRETRAINED_MODEL_PATH = r"models\CoordsToLatentSpace\20250105\best_model.pth"
 
 NUM_SAMPLES_IN_DATAFRAME = 100
 
-AMINO_ACIDS = ['<null_0>', '<pad>', '<eos>', '<unk>', 'L', 'A', 'G', 'V', 'S', 'E',
-               'R', 'T', 'I', 'D', 'P', 'K', 'Q', 'N', 'F', 'Y', 'M', 'H', 'W', 'C',
-               'X', 'B', 'U', 'Z', 'O', '.', '-', '<null_1>', '<mask>', '<cath>', '<af2>']
+AMINO_ACIDS = 'ACDEFGHIKLMNPQRSTVWYX'
 AMINO_ACID_TO_INDEX = {aa: i for i, aa in enumerate(AMINO_ACIDS)}
 
 MIN_SIZE = 3

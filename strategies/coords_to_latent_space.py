@@ -20,16 +20,16 @@ class CoordsToLatentSpace(Base):
         self.lm_head = pretrained_llm.lm_head
 
         class Args:
+            in_dim = 1280
             hidden_dim = 1280
             trans_layers = 6
             th = 0.5
             seq_noise = 0.1
-            in_dim = 128
             backbone_noise = 0.1
             dropout = 0.1
+            drop_edge = 0
             gvp = True
             h_attend = False
-            drop_edge = 0
 
         args = Args()
         k_neighbors = 30
@@ -50,7 +50,7 @@ class CoordsToLatentSpace(Base):
 
         # Build the batch
         for i, data in enumerate(batch_data):
-            x = batch_data["coords"]
+            x = data["coords"]
             l = len(data['sequence'])
             x_pad = np.pad(x, [[0, L_max - l], [0, 0], [0, 0]], 'constant', constant_values=(np.nan,))
             X[i, :, :, :] = x_pad

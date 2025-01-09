@@ -20,8 +20,8 @@ class CoordsToLatentSpace(Base):
         self.lm_head = pretrained_llm.lm_head
 
         class Args:
-            in_dim = 1280
-            hidden_dim = 1280
+            in_dim = 128
+            hidden_dim = 128
             trans_layers = 6
             th = 0.5
             seq_noise = 0.1
@@ -34,6 +34,8 @@ class CoordsToLatentSpace(Base):
         args = Args()
         k_neighbors = 30
         self.inverse_model = Model(args, k_neighbors)
+        self.representation_size = 1280
+        self.fc = nn.Linear(args.hidden_dim, self.representation_size)
 
         self.loss_fn = nn.CosineEmbeddingLoss()
         self.device = "cuda:0"
@@ -92,7 +94,8 @@ class CoordsToLatentSpace(Base):
     def forward(self, inputs):
         X, S, mask, residue_idx, chain_encoding_all = inputs
         logits, features = self.inverse_model(X, S, mask, residue_idx, chain_encoding_all, feat=True)
-        return features, mask
+        output = self.fc(features)
+        return output, mask
 
     def compute_loss(self, outputs, ground_truth):
         prediction, padding_mask = outputs
@@ -100,8 +103,8 @@ class CoordsToLatentSpace(Base):
         ground_truth = ground_truth.reshape(-1, ground_truth.size(-1))
         padding_mask = padding_mask.reshape(-1)
 
-        filtered_prediction = prediction[~padding_mask]
-        filtered_ground_truth = ground_truth[~padding_mask]
+        filtered_prediction = prediction[padding_mask == 1]
+        filtered_ground_truth = ground_truth[padding_mask == 1]
 
         # Create target tensor for cosine embedding loss
         target = torch.ones(filtered_prediction.size(0), device=prediction.device)

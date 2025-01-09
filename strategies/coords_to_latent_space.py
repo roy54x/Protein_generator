@@ -46,14 +46,14 @@ class CoordsToLatentSpace(Base):
         chain_encoding_all = np.zeros([B, L_max], dtype=np.int32)
 
         # Build the batch
-        for i, row in enumerate(batch_data.iterrows()):
+        for i, data in enumerate(batch_data):
             x = batch_data["coords"]
-            l = len(row['sequence'])
+            l = len(data['sequence'])
             x_pad = np.pad(x, [[0, L_max - l], [0, 0], [0, 0]], 'constant', constant_values=(np.nan,))
             X[i, :, :, :] = x_pad
             residue_idx[i, 0: l] = np.arange(0, l)
             chain_encoding_all[i, 0: l] = np.ones(l)
-            indices = np.asarray([AMINO_ACIDS.index(a) for a in row['sequence']], dtype=np.int32)
+            indices = np.asarray([AMINO_ACIDS.index(a) for a in data['sequence']], dtype=np.int32)
             S[i, :l] = indices
 
         # Mask
@@ -88,7 +88,7 @@ class CoordsToLatentSpace(Base):
 
     def forward(self, inputs):
         X, S, mask, residue_idx, chain_encoding_all = inputs
-        logits, features = self.inverse_model(X, S, residue_idx, chain_encoding_all, feat=True)
+        logits, features = self.inverse_model(X, S, mask, residue_idx, chain_encoding_all, feat=True)
         return features, mask
 
     def compute_loss(self, outputs, ground_truth):

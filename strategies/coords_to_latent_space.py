@@ -120,7 +120,8 @@ class CoordsToLatentSpace(Base):
 
         # Get the predicted representation from the model
         gt_representations = gt_representations.to(self.device)
-        self.gvp_transformer_encoder = self.gvp_transformer_encoder.to(self.device)
+        self.inverse_model = self.inverse_model.to(self.device)
+        self.fc = self.fc.to(self.device)
         outputs = self(inputs)
         loss = self.compute_loss(outputs, gt_representations).item()
         print(f"Distance in Embedding space is: {loss}")

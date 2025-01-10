@@ -19,23 +19,12 @@ class CoordsToLatentSpace(Base):
         pretrained_llm, self.llm_alphabet = esm.pretrained.esm2_t33_650M_UR50D()
         self.lm_head = pretrained_llm.lm_head
 
-        class Args:
-            in_dim = 128
-            hidden_dim = 128
-            trans_layers = 6
-            th = 0.5
-            seq_noise = 0.1
-            backbone_noise = 0.1
-            dropout = 0.1
-            drop_edge = 0
-            gvp = True
-            h_attend = False
-
-        args = Args()
-        k_neighbors = 30
-        self.inverse_model = Model(args, k_neighbors)
+        checkpoint = torch.load("ProRefiner/model/checkpoint.pth")
+        self.k_neighbors = 30
+        self.inverse_model = Model(checkpoint["args"], self.k_neighbors,
+                                   n_head=checkpoint["args"].encoder_attention_heads)
         self.representation_size = 1280
-        self.fc = nn.Linear(args.hidden_dim, self.representation_size)
+        self.fc = nn.Linear(checkpoint["args"].hidden_dim, self.representation_size)
 
         self.loss_fn = nn.CosineEmbeddingLoss()
         self.device = "cuda:0"

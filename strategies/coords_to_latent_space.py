@@ -77,15 +77,12 @@ class CoordsToLatentSpace(Base):
         # Process representations separately
         representations = []
         for data in batch_data:
-            representation = torch.tensor(data['representations'])
+            representation = torch.tensor(data['representations'])[1:-1]
             padding_size = max(lengths.cpu().numpy()) - representation.size(0)
             representation_padded = torch.nn.functional.pad(
-                representation[:-1],
+                representation,
                 (0, 0, 0, padding_size),
                 mode="constant", value=0)
-            representation_padded = torch.concat([representation_padded,
-                                                  torch.unsqueeze(representation[-1],
-                                                                  0)], 0)
             representations.append(representation_padded)
 
         # Return features from get_features and stacked representations
@@ -129,7 +126,7 @@ class CoordsToLatentSpace(Base):
         # Get the predicted sequence based on the decoder
         predicted_representations, padding_mask = outputs
         self.lm_head = self.lm_head.to(self.device)
-        predicted_logits = self.lm_head(predicted_representations[:, 1:len(ground_truth_sequence) + 1])
+        predicted_logits = self.lm_head(predicted_representations)
         predicted_indices = torch.argmax(predicted_logits, dim=-1)
         predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
 

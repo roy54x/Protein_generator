@@ -20,11 +20,14 @@ class CoordsToLatentSpace(Base):
         self.lm_head = pretrained_llm.lm_head
 
         checkpoint = torch.load("ProRefiner/model/checkpoint.pth")
-        self.k_neighbors = 30
-        self.inverse_model = Model(checkpoint["args"], self.k_neighbors,
-                                   n_head=checkpoint["args"].encoder_attention_heads)
-        self.representation_size = 1280
-        self.fc = nn.Linear(checkpoint["args"].hidden_dim, self.representation_size)
+        args = checkpoint["args"]
+        args.trans_layers = 8
+        args.encoder_attention_heads = 8
+        args.hidden_dim = 128
+        k_neighbors = 30
+        self.inverse_model = Model(args, k_neighbors, n_head=args.encoder_attention_heads)
+        representation_size = 1280
+        self.fc = nn.Linear(checkpoint["args"].hidden_dim, representation_size)
 
         self.loss_fn = nn.CosineEmbeddingLoss()
         self.device = "cuda:0"

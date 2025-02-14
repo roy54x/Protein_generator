@@ -6,8 +6,10 @@ from esm.inverse_folding.gvp_transformer_encoder import GVPTransformerEncoder
 from esm.inverse_folding.util import CoordBatchConverter
 from torch import nn
 
-from constants import MAX_TRAINING_SIZE
+from constants import MAX_TRAINING_SIZE, AMINO_ACIDS
 from strategies.base import Base
+
+from ProRefiner.model.model import Model
 
 
 class CoordsToLatentSpace(Base):
@@ -16,63 +18,73 @@ class CoordsToLatentSpace(Base):
         super(CoordsToLatentSpace, self).__init__()
         pretrained_llm, self.llm_alphabet = esm.pretrained.esm2_t33_650M_UR50D()
         self.lm_head = pretrained_llm.lm_head
-        self.pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
 
-        args = self.pretrained_inverse_model.args
-        args.encoder_embed_dim = 1280
-        args.encoder_ffn_embed_dim = 256
-        args.encoder_layers = 4
-        args.encoder_attention_heads = 4
-        args.gvp_node_hidden_dim_scalar = 128
-        args.gvp_node_hidden_dim_vector = 32
-        args.gvp_edge_hidden_dim_scalar = 4
-        args.max_tokens = MAX_TRAINING_SIZE
-
-        encoder_embed_tokens = self.pretrained_inverse_model.build_embedding(
-            args, inverse_alphabet, args.encoder_embed_dim,
-        )
-        self.gvp_transformer_encoder = GVPTransformerEncoder(args, inverse_alphabet, encoder_embed_tokens)
-        self.inverse_batch_converter = CoordBatchConverter(inverse_alphabet)
-
-        self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
+        checkpoint = torch.load("ProRefiner/model/checkpoint.pth")
+        args = checkpoint["args"]
+        args.trans_layers = 8
+        args.encoder_attention_heads = 8
+        args.hidden_dim = 128
+        k_neighbors = 30
+        self.inverse_model = Model(args, k_neighbors, n_head=args.encoder_attention_heads)
+        representation_size = 1280
+        self.fc = nn.Linear(checkpoint["args"].hidden_dim, representation_size)
 
         self.loss_fn = nn.CosineEmbeddingLoss()
         self.device = "cuda:0"
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
-        inverse_batch_converter_input = []
+        """ Pack and pad batch into torch tensors """
+        B = len(batch_data)
+        lengths = np.array([min(len(b['sequence']), MAX_TRAINING_SIZE) for b in batch_data], dtype=np.int32)
+        L_max = max([min(len(b['sequence']), MAX_TRAINING_SIZE) for b in batch_data])
+        X = np.zeros([B, L_max, 4, 3])
+        S = np.zeros([B, L_max], dtype=np.int32)
+        residue_idx = -100 * np.ones([B, L_max], dtype=np.int32)
+        chain_encoding_all = np.zeros([B, L_max], dtype=np.int32)
+
+        # Build the batch
+        for i, data in enumerate(batch_data):
+            x = data["coords"]
+            l = len(data['sequence'])
+            x_pad = np.pad(x, [[0, L_max - l], [0, 0], [0, 0]], 'constant', constant_values=(np.nan,))
+            X[i, :, :, :] = x_pad
+            residue_idx[i, 0: l] = np.arange(0, l)
+            chain_encoding_all[i, 0: l] = np.ones(l)
+            indices = np.asarray([AMINO_ACIDS.index(a) for a in data['sequence']], dtype=np.int32)
+            S[i, :l] = indices
+
+        # Mask
+        isnan = np.isnan(X)
+        mask = np.isfinite(np.sum(X, (2, 3))).astype(np.float32)
+        X[isnan] = 0.
+
+        # Conversion
+        S = torch.from_numpy(S).to(dtype=torch.long, device=self.device)
+        X = torch.from_numpy(X).to(dtype=torch.float32, device=self.device)
+        mask = torch.from_numpy(mask).to(dtype=torch.float32, device=self.device)
+        residue_idx = torch.from_numpy(residue_idx).to(dtype=torch.long, device=self.device)
+        chain_encoding_all = torch.from_numpy(chain_encoding_all).to(dtype=torch.long, device=self.device)
+        lengths = torch.from_numpy(lengths).to(dtype=torch.long, device=self.device)
+
+        # Process representations separately
         representations = []
-
         for data in batch_data:
-            sequence = data['sequence']
-            padding_size = MAX_TRAINING_SIZE - len(sequence)
-
-            sequence_padded = sequence + self.padding_token * padding_size
-            coords = [[[float('inf') if x is None else x for x in atom]
-                       for atom in residue] for residue in data['coords']]
-            coords_padded = (coords + [[[np.nan] * len(coords[0][0])]
-                                       * len(coords[0])] * padding_size)
-            inverse_batch_converter_input.append((coords_padded, None, sequence_padded))
-
-            representation = torch.tensor(data['representations'])
+            representation = torch.tensor(data['representations'])[1:-1]
+            padding_size = max(lengths.cpu().numpy()) - representation.size(0)
             representation_padded = torch.nn.functional.pad(
-                representation[:-1],
+                representation,
                 (0, 0, 0, padding_size),
                 mode="constant", value=0)
-            representation_padded = torch.concat([representation_padded,
-                                                  torch.unsqueeze(representation[-1],
-                                                                  0)], 0)
             representations.append(representation_padded)
 
-        coords, confidence, strs, tokens, padding_mask = self.inverse_batch_converter(
-            inverse_batch_converter_input, device=self.device)
-
-        return (coords, padding_mask, confidence), torch.stack(representations, 0)
+        # Return features from get_features and stacked representations
+        return (X, S, mask, residue_idx, chain_encoding_all), torch.stack(representations, 0)
 
     def forward(self, inputs):
-        coords, padding_mask, confidence = inputs
-        encoder_out = self.gvp_transformer_encoder(coords, padding_mask, confidence)
-        return encoder_out["encoder_out"][0].transpose(0, 1), padding_mask
+        X, S, mask, residue_idx, chain_encoding_all = inputs
+        logits, features = self.inverse_model(X, S, mask, residue_idx, chain_encoding_all, feat=True)
+        output = self.fc(features)
+        return output, mask
 
     def compute_loss(self, outputs, ground_truth):
         prediction, padding_mask = outputs
@@ -80,8 +92,8 @@ class CoordsToLatentSpace(Base):
         ground_truth = ground_truth.reshape(-1, ground_truth.size(-1))
         padding_mask = padding_mask.reshape(-1)
 
-        filtered_prediction = prediction[~padding_mask]
-        filtered_ground_truth = ground_truth[~padding_mask]
+        filtered_prediction = prediction[padding_mask == 1]
+        filtered_ground_truth = ground_truth[padding_mask == 1]
 
         # Create target tensor for cosine embedding loss
         target = torch.ones(filtered_prediction.size(0), device=prediction.device)
@@ -97,7 +109,8 @@ class CoordsToLatentSpace(Base):
 
         # Get the predicted representation from the model
         gt_representations = gt_representations.to(self.device)
-        self.gvp_transformer_encoder = self.gvp_transformer_encoder.to(self.device)
+        self.inverse_model = self.inverse_model.to(self.device)
+        self.fc = self.fc.to(self.device)
         outputs = self(inputs)
         loss = self.compute_loss(outputs, gt_representations).item()
         print(f"Distance in Embedding space is: {loss}")
@@ -105,7 +118,7 @@ class CoordsToLatentSpace(Base):
         # Get the predicted sequence based on the decoder
         predicted_representations, padding_mask = outputs
         self.lm_head = self.lm_head.to(self.device)
-        predicted_logits = self.lm_head(predicted_representations[:, 1:len(ground_truth_sequence)+1])
+        predicted_logits = self.lm_head(predicted_representations)
         predicted_indices = torch.argmax(predicted_logits, dim=-1)
         predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
 
@@ -119,4 +132,4 @@ class CoordsToLatentSpace(Base):
         return recovery_rate
 
     def get_parameter_count(self):
-        return sum(p.numel() for p in self.gvp_transformer_encoder.parameters() if p.requires_grad)
+        return sum(p.numel() for p in self.inverse_model.parameters() if p.requires_grad)

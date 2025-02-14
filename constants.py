@@ -1,4 +1,4 @@
-MAIN_DIR = r"D:\python project\data\Proteins"
+MAIN_DIR = r"/content/drive/My Drive/Colab Notebooks/proteins"
 PRETRAINED_MODEL_PATH = r"models\CoordsToLatentSpace\20250105\best_model.pth"
 
 NUM_SAMPLES_IN_DATAFRAME = 100

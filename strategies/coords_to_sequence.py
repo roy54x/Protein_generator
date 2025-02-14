@@ -28,7 +28,8 @@ class CoordsToSequence(Base):
 
         for data in batch_data:
             sequence = data['sequence']
-            coords = data['coords']
+            coords = [[[float('inf') if x is None else x for x in atom]
+                       for atom in residue] for residue in data['coords']]
             batch_converter_input.append((coords, None, sequence))
 
         coords, confidence, strs, tokens, padding_mask = self.batch_converter(
@@ -41,7 +42,7 @@ class CoordsToSequence(Base):
 
     def forward(self, inputs):
         coords, padding_mask, confidence, prev_output_tokens = inputs
-        outputs, _ = self.model(coords, padding_mask, confidence, prev_output_tokens)
+        outputs, _ = self.gvp_transformer(coords, padding_mask, confidence, prev_output_tokens)
         return outputs
 
     def compute_loss(self, outputs, ground_truth):

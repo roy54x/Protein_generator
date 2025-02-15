@@ -87,7 +87,7 @@ class Trainer:
                     self.optimizer.step()
 
                     total_train_loss += loss.item()
-                    total_train_samples += len(ground_truth)
+                    total_train_samples += 1
                     batch_count += 1
 
                     # Print every 10 batches

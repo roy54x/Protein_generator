@@ -18,21 +18,9 @@ class CoordsToLatentSpace(Base):
         self.lm_head = pretrained_llm.lm_head
         self.pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
 
-        args = self.pretrained_inverse_model.args
-        args.encoder_embed_dim = 1280
-        args.encoder_ffn_embed_dim = 256
-        args.encoder_layers = 4
-        args.encoder_attention_heads = 4
-        args.gvp_node_hidden_dim_scalar = 128
-        args.gvp_node_hidden_dim_vector = 32
-        args.gvp_edge_hidden_dim_scalar = 4
-        args.max_tokens = MAX_TRAINING_SIZE
-
-        encoder_embed_tokens = self.pretrained_inverse_model.build_embedding(
-            args, inverse_alphabet, args.encoder_embed_dim,
-        )
-        self.gvp_transformer_encoder = GVPTransformerEncoder(args, inverse_alphabet, encoder_embed_tokens)
         self.inverse_batch_converter = CoordBatchConverter(inverse_alphabet)
+        self.gvp_transformer_encoder = self.pretrained_inverse_model.encoder
+        self.linear = nn.Linear(512, 1280)
 
         self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
 
@@ -72,7 +60,9 @@ class CoordsToLatentSpace(Base):
     def forward(self, inputs):
         coords, padding_mask, confidence = inputs
         encoder_out = self.gvp_transformer_encoder(coords, padding_mask, confidence)
-        return encoder_out["encoder_out"][0].transpose(0, 1), padding_mask
+        x = encoder_out["encoder_out"][0].transpose(0, 1)
+        x = self.linear(x)
+        return x, padding_mask
 
     def compute_loss(self, outputs, ground_truth):
         prediction, padding_mask = outputs

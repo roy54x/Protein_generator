@@ -15,10 +15,11 @@ class CoordsToSequence(Base):
     def __init__(self):
         super(CoordsToSequence, self).__init__()
         self.pretrained_model, self.alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
-        self.args = self.pretrained_model.args
-        self.pretrained_model = None
+        #self.args = self.pretrained_model.args
+        #self.pretrained_model = None
 
-        self.gvp_transformer = GVPTransformerModel(self.args, self.alphabet)
+        #self.gvp_transformer = GVPTransformerModel(self.args, self.alphabet)
+        self.gvp_transformer = self.pretrained_model
         self.batch_converter = CoordBatchConverter(self.alphabet)
         self.device = next(self.gvp_transformer.parameters()).device
 

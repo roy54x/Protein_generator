@@ -11,7 +11,7 @@ from strategies.coords_to_sequence import CoordsToSequence
 from strategies.sequence_to_distogram import SequenceToDistogram
 
 if __name__ == '__main__':
-    strategy = CoordsToLatentSpace()
+    strategy = CoordsToSequence()
 
     model_path = os.path.join(MAIN_DIR, PRETRAINED_MODEL_PATH)
     state_dict = torch.load(model_path)

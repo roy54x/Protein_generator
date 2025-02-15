@@ -15,9 +15,7 @@ class CoordsToSequence(Base):
     def __init__(self):
         super(CoordsToSequence, self).__init__()
         self.pretrained_model, self.alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
-
         self.args = self.pretrained_model.args
-        self.args.max_tokens = MAX_TRAINING_SIZE
         self.pretrained_model = None
 
         self.gvp_transformer = GVPTransformerModel(self.args, self.alphabet)
@@ -47,7 +45,7 @@ class CoordsToSequence(Base):
         return outputs
 
     def compute_loss(self, outputs, ground_truth):
-        return F.cross_entropy(outputs, ground_truth)
+        return F.cross_entropy(outputs, ground_truth, reduction='none')
 
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]

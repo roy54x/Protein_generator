@@ -1,5 +1,5 @@
 MAIN_DIR = r"/content/drive/My Drive/Colab Notebooks/proteins"
-PRETRAINED_MODEL_PATH = r"models\CoordsToLatentSpace\20250105\best_model.pth"
+PRETRAINED_MODEL_PATH = r"models\CoordsToSequence\20250215\best_model.pth"
 
 NUM_SAMPLES_IN_DATAFRAME = 100
 

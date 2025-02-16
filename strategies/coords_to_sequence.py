@@ -16,9 +16,10 @@ class CoordsToSequence(Base):
         super(CoordsToSequence, self).__init__()
         self.pretrained_model, self.alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
         self.args = self.pretrained_model.args
-        self.pretrained_model = None
+        self.gvp_transformer = self.pretrained_model
+        #self.pretrained_model = None
 
-        self.gvp_transformer = GVPTransformerModel(self.args, self.alphabet)
+        #self.gvp_transformer = GVPTransformerModel(self.args, self.alphabet)
         self.batch_converter = CoordBatchConverter(self.alphabet)
         self.device = next(self.gvp_transformer.parameters()).device
 
@@ -41,11 +42,17 @@ class CoordsToSequence(Base):
 
     def forward(self, inputs):
         coords, padding_mask, confidence, prev_output_tokens = inputs
-        outputs, _ = self.gvp_transformer(coords, padding_mask, confidence, prev_output_tokens)
-        return outputs
+        logits, _ = self.gvp_transformer(coords, padding_mask, confidence, prev_output_tokens)
+        return logits, coords[:, 1:-1]
 
     def compute_loss(self, outputs, ground_truth):
-        return F.cross_entropy(outputs, ground_truth)
+        target_padding_mask = (ground_truth == self.alphabet.padding_idx)
+        logits, coords = outputs
+        loss = F.cross_entropy(logits, ground_truth, reduction='none')
+        coord_mask = torch.isfinite(coords).all(dim=(-1, -2))
+        mask = (~target_padding_mask) & (coord_mask)
+        ll = torch.sum(loss * mask) / torch.sum(mask)
+        return ll
 
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]

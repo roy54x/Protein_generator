@@ -36,7 +36,6 @@ class CoordsToLatentSpace(Base):
         )
         roberta = RobertaModel(roberta_config)
         self.roberta_encoder = roberta.encoder
-        self.roberta_pooler = roberta.pooler
 
         self.loss_fn = nn.CosineEmbeddingLoss()
         self.device = "cuda:0"
@@ -76,8 +75,7 @@ class CoordsToLatentSpace(Base):
         encoder_out = self.gvp_transformer_encoder(coords, padding_mask, confidence)
         x = encoder_out["encoder_out"][0].transpose(0, 1)
         x = self.linear(x)
-        roberta_output = self.roberta_encoder(hidden_states=x, attention_mask=~padding_mask[:, None, None, :])
-        roberta_output = self.roberta_pooler(roberta_output.last_hidden_state)
+        roberta_output = self.roberta_encoder(hidden_states=x, attention_mask=~padding_mask[:, None, None, :]).last_hidden_state
         return roberta_output, padding_mask
 
     def compute_loss(self, outputs, ground_truth):
@@ -111,7 +109,7 @@ class CoordsToLatentSpace(Base):
         # Get the predicted sequence based on the decoder
         predicted_representations, padding_mask = outputs
         self.lm_head = self.lm_head.to(self.device)
-        predicted_logits = self.lm_head(predicted_representations[:, 1:len(ground_truth_sequence)+1])
+        predicted_logits = self.lm_head(predicted_representations[:, 1:len(ground_truth_sequence) + 1])
         predicted_indices = torch.argmax(predicted_logits, dim=-1)
         predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
 
@@ -123,4 +121,3 @@ class CoordsToLatentSpace(Base):
         recovery_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
         print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
         return recovery_rate
-

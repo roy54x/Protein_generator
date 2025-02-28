@@ -30,9 +30,9 @@ class CoordsToLatentSpace(Base):
         self.linear = nn.Linear(512, 1280)
         roberta_config = RobertaConfig(
             hidden_size=1280,
-            num_hidden_layers=3,
-            num_attention_heads=8,
-            intermediate_size=2048
+            num_hidden_layers=2,
+            num_attention_heads=4,
+            intermediate_size=512
         )
         roberta = RobertaModel(roberta_config)
         self.roberta_encoder = roberta.encoder

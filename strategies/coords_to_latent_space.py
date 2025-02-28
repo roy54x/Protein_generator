@@ -30,11 +30,13 @@ class CoordsToLatentSpace(Base):
         self.linear = nn.Linear(512, 1280)
         roberta_config = RobertaConfig(
             hidden_size=1280,
-            num_hidden_layers=2,
-            num_attention_heads=1,
-            intermediate_size=512
+            num_hidden_layers=3,
+            num_attention_heads=8,
+            intermediate_size=2048
         )
-        self.roberta = RobertaModel(roberta_config)
+        roberta = RobertaModel(roberta_config)
+        self.roberta_encoder = roberta.encoder
+        self.roberta_pooler = roberta.pooler
 
         self.loss_fn = nn.CosineEmbeddingLoss()
         self.device = "cuda:0"
@@ -74,7 +76,8 @@ class CoordsToLatentSpace(Base):
         encoder_out = self.gvp_transformer_encoder(coords, padding_mask, confidence)
         x = encoder_out["encoder_out"][0].transpose(0, 1)
         x = self.linear(x)
-        roberta_output = self.roberta(inputs_embeds=x, attention_mask=~padding_mask)[0]
+        roberta_output = self.roberta_encoder(hidden_states=x, attention_mask=~padding_mask[:, None, None, :])
+        roberta_output = self.roberta_pooler(roberta_output.last_hidden_state)
         return roberta_output, padding_mask
 
     def compute_loss(self, outputs, ground_truth):

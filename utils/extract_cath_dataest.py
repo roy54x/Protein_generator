@@ -34,7 +34,7 @@ def process_cath_data(cath_file, splits):
             processed_coords = []
             for residue_idx in range(len(coords["CA"])):
                 residue_coords = []
-                for atom in ['N', 'CA', 'C']:  # For each atom in the residue
+                for atom in ['N', 'CA', 'C', "O"]:  # For each atom in the residue
                     atom_coords = coords[atom][residue_idx]
                     residue_coords.append(atom_coords)
                 processed_coords.append(residue_coords)
@@ -53,7 +53,6 @@ def process_cath_data(cath_file, splits):
                     "dataset": dataset
                 })
     return pd.DataFrame(rows)
-
 
 
 if __name__ == "__main__":

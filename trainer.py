@@ -142,6 +142,6 @@ class Trainer:
 if __name__ == '__main__':
     data_path = os.path.join(MAIN_DIR, "cath_data/train_set")
     pretrained_model_path = os.path.join(MAIN_DIR)
-    strategy = CoordsToSequence()
+    strategy = CoordsToLatentSpace()
     trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, val_size=0.15)
     trainer.train(epochs=10000)

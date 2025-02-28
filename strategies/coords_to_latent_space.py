@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from esm.inverse_folding.gvp_transformer_encoder import GVPTransformerEncoder
 from esm.inverse_folding.util import CoordBatchConverter
 from torch import nn
+from transformers import RobertaConfig, RobertaModel
 
 from constants import MAX_TRAINING_SIZE
 from strategies.base import Base
@@ -16,13 +17,24 @@ class CoordsToLatentSpace(Base):
         super(CoordsToLatentSpace, self).__init__()
         pretrained_llm, self.llm_alphabet = esm.pretrained.esm2_t33_650M_UR50D()
         self.lm_head = pretrained_llm.lm_head
-        self.pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
+        for name, param in self.lm_head.named_parameters():
+            param.requires_grad = False
 
+        pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
+        self.gvp_transformer_encoder = pretrained_inverse_model.encoder
+        for name, param in self.gvp_transformer_encoder.named_parameters():
+            param.requires_grad = False
         self.inverse_batch_converter = CoordBatchConverter(inverse_alphabet)
-        self.gvp_transformer_encoder = self.pretrained_inverse_model.encoder
-        self.linear = nn.Linear(512, 1280)
-
         self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
+
+        self.linear = nn.Linear(512, 1280)
+        roberta_config = RobertaConfig(
+            hidden_size=1280,
+            num_hidden_layers=2,
+            num_attention_heads=1,
+            intermediate_size=512
+        )
+        self.roberta = RobertaModel(roberta_config)
 
         self.loss_fn = nn.CosineEmbeddingLoss()
         self.device = "cuda:0"
@@ -62,7 +74,8 @@ class CoordsToLatentSpace(Base):
         encoder_out = self.gvp_transformer_encoder(coords, padding_mask, confidence)
         x = encoder_out["encoder_out"][0].transpose(0, 1)
         x = self.linear(x)
-        return x, padding_mask
+        roberta_output = self.roberta(inputs_embeds=x, attention_mask=~padding_mask)[0]
+        return roberta_output, padding_mask
 
     def compute_loss(self, outputs, ground_truth):
         prediction, padding_mask = outputs
@@ -108,5 +121,3 @@ class CoordsToLatentSpace(Base):
         print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
         return recovery_rate
 
-    def get_parameter_count(self):
-        return sum(p.numel() for p in self.gvp_transformer_encoder.parameters() if p.requires_grad)

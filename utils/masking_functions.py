@@ -12,7 +12,7 @@ def apply_random_mask_on_coords(coords, mask_ratio=RANDOM_MASK_RATIO):
     mask_indices = random.sample(range(num_residues), num_to_mask)
 
     for idx in mask_indices:
-        coords[idx] = [[[np.nan] * 3] * 4]  # Mask all 3 backbone coordinates
+        coords[idx] = [[[float("inf")] * 3] * 4]  # Mask all 3 backbone coordinates
 
     return coords
 
@@ -30,6 +30,6 @@ def apply_span_mask_on_coords(coords, mask_ratio=SPAN_MASK_RATIO):
                 masked_indices.add(i)
 
     for idx in masked_indices:
-        coords[idx] = [[[np.nan] * 3] * 4]  # Mask all 3 backbone coordinates
+        coords[idx] = [[[float("inf")] * 3] * 4]  # Mask all 3 backbone coordinates
 
     return coords

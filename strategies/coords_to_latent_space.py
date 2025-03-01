@@ -52,12 +52,12 @@ class CoordsToLatentSpace(Base):
             padding_size = MAX_TRAINING_SIZE - len(sequence)
             sequence_padded = sequence + self.padding_token * padding_size
 
-            coords = [[[np.nan if x is None else x for x in atom]
+            coords = [[[float("inf") if x is None else x for x in atom]
                        for atom in residue] for residue in data['coords']]
             if self.training:
                 coords = apply_random_mask_on_coords(coords)
                 coords = apply_span_mask_on_coords(coords)
-            coords_padded = (coords + [[[np.nan] * len(coords[0][0])] * len(coords[0])] * padding_size)
+            coords_padded = (coords + [[[float("inf")] * len(coords[0][0])] * len(coords[0])] * padding_size)
             inverse_batch_converter_input.append((coords_padded, None, sequence_padded))
 
             representation = torch.tensor(data['representations'])

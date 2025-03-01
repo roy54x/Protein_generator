@@ -8,7 +8,8 @@ import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
-from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME, BATCH_SIZE
+from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME, BATCH_SIZE, \
+    PRETRAINED_MODEL_PATH
 from strategies.contact_map_to_sequence import ContactMapToSequence
 from strategies.coords_to_latent_space import CoordsToLatentSpace
 from strategies.coords_to_sequence import CoordsToSequence
@@ -37,8 +38,8 @@ class Trainer:
         self.strategy = strategy.to(device)
         self.pretrained_model_path = pretrained_model_path
         if os.path.exists(self.pretrained_model_path):
-            model = torch.load(pretrained_model_path)
-            self.strategy.load_state_dict(model)
+            state_dict = torch.load(pretrained_model_path)
+            self.strategy.load_state_dict(state_dict)
         else:
             warnings.warn("Pretrained model path does not exist. Skipping")
             self.pretrained_model_path = None
@@ -141,7 +142,8 @@ class Trainer:
 
 if __name__ == '__main__':
     data_path = os.path.join(MAIN_DIR, "cath_data/train_set")
-    pretrained_model_path = os.path.join(MAIN_DIR)
+    pretrained_model_path = os.path.join(MAIN_DIR, PRETRAINED_MODEL_PATH)
     strategy = CoordsToLatentSpace()
-    trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, val_size=0.15)
+    trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, val_size=0.15,
+                      pretrained_model_path=pretrained_model_path)
     trainer.train(epochs=10000)

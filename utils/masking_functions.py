@@ -1,7 +1,5 @@
 import random
 
-import numpy as np
-
 from constants import RANDOM_MASK_RATIO, SPAN_MASK_RATIO, MAX_SPAN_LENGTH
 
 

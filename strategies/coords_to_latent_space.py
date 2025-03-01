@@ -9,7 +9,7 @@ from esm.inverse_folding.util import CoordBatchConverter
 from torch import nn
 from transformers import RobertaConfig, RobertaModel
 
-from constants import MAX_TRAINING_SIZE
+from constants import MAX_TRAINING_SIZE, RANDOM_MASK_RATIO
 from strategies.base import Base
 from utils.masking_functions import apply_random_mask_on_coords, apply_span_mask_on_coords
 
@@ -54,7 +54,7 @@ class CoordsToLatentSpace(Base):
 
             coords = [[[float("inf") if x is None else x for x in atom]
                        for atom in residue] for residue in data['coords']]
-            if self.training:
+            if self.training and RANDOM_MASK_RATIO > 0:
                 coords = apply_random_mask_on_coords(coords)
                 coords = apply_span_mask_on_coords(coords)
             coords_padded = (coords + [[[float("inf")] * len(coords[0][0])] * len(coords[0])] * padding_size)
@@ -80,7 +80,8 @@ class CoordsToLatentSpace(Base):
         encoder_out = self.gvp_transformer_encoder(coords, padding_mask, confidence)
         x = encoder_out["encoder_out"][0].transpose(0, 1)
         x = self.linear(x)
-        roberta_output = self.roberta_encoder(hidden_states=x, attention_mask=~padding_mask[:, None, None, :]).last_hidden_state
+        roberta_output = self.roberta_encoder(hidden_states=x,
+                                              attention_mask=~padding_mask[:, None, None, :]).last_hidden_state
         return roberta_output, padding_mask
 
     def compute_loss(self, outputs, ground_truth):

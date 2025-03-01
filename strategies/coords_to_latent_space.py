@@ -1,17 +1,11 @@
-import random
-
 import esm
-import numpy as np
 import torch
-import torch.nn.functional as F
-from esm.inverse_folding.gvp_transformer_encoder import GVPTransformerEncoder
 from esm.inverse_folding.util import CoordBatchConverter
 from torch import nn
 from transformers import RobertaConfig, RobertaModel
 
-from constants import MAX_TRAINING_SIZE, RANDOM_MASK_RATIO
+from constants import MAX_TRAINING_SIZE
 from strategies.base import Base
-from utils.masking_functions import apply_random_mask_on_coords, apply_span_mask_on_coords
 
 
 class CoordsToLatentSpace(Base):
@@ -54,9 +48,7 @@ class CoordsToLatentSpace(Base):
 
             coords = [[[float("inf") if x is None else x for x in atom]
                        for atom in residue] for residue in data['coords']]
-            if self.training and RANDOM_MASK_RATIO > 0:
-                coords = apply_random_mask_on_coords(coords)
-                coords = apply_span_mask_on_coords(coords)
+
             coords_padded = (coords + [[[float("inf")] * len(coords[0][0])] * len(coords[0])] * padding_size)
             inverse_batch_converter_input.append((coords_padded, None, sequence_padded))
 
@@ -127,4 +119,4 @@ class CoordsToLatentSpace(Base):
         # Calculate and print the average recovery rate
         recovery_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
         print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
-        return recovery_rate
+        return loss, recovery_rate

@@ -1,5 +1,5 @@
-MAIN_DIR = r"/content/drive/My Drive/Colab Notebooks/proteins"
-PRETRAINED_MODEL_PATH = r"models\CoordsToSequence\20250216\best_model.pth"
+MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
+PRETRAINED_MODEL_PATH = r"models\CoordsToLatentSpace\20250301\best_model.pth"
 
 NUM_SAMPLES_IN_DATAFRAME = 100
 
@@ -11,6 +11,6 @@ AMINO_ACID_TO_INDEX = {aa: i for i, aa in enumerate(AMINO_ACIDS)}
 MIN_SIZE = 3
 MAX_TRAINING_SIZE = 250
 MAX_SIZE = 250
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 
 DECAY_RATE = 0.25

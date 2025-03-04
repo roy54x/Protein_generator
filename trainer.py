@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
+from torch import optim
 from torch.utils.data import DataLoader, Dataset
 
 from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME, BATCH_SIZE, \
@@ -47,7 +48,7 @@ class Trainer:
         self.batch_size = batch_size
         self.val_size = val_size
         self.device = device
-        self.optimizer = torch.optim.Adam(strategy.parameters(), lr=0.001)
+        self.optimizer = optim.Adam(strategy.parameters(), lr=1e-3, weight_decay=1e-4)
         self.best_val_loss = float('inf')
 
         # Collect all file paths from the directory

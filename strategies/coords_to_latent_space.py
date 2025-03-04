@@ -37,9 +37,11 @@ class CoordsToLatentSpace(Base):
         roberta = RobertaModel(roberta_config)
         self.roberta_encoder = roberta.encoder
 
-        self.cosine_loss = nn.CosineEmbeddingLoss()
-        self.cross_entropy = nn.CrossEntropyLoss()
         self.softmax = nn.Softmax()
+        self.cross_entropy = nn.CrossEntropyLoss()
+        self.cosine_loss = nn.CosineEmbeddingLoss()
+        self.cosine_coefficient = 10
+
         self.device = "cuda:0"
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
@@ -88,6 +90,8 @@ class CoordsToLatentSpace(Base):
         prediction, padding_mask = outputs
         ground_truth_representations, ground_truth_tokens = ground_truth
         logits = self.softmax(self.lm_head(prediction))
+        num_classes = logits.shape[-1]  # Get the number of classes
+        ground_truth_tokens = torch.clamp(ground_truth_tokens, min=0, max=num_classes - 1)
 
         prediction = prediction.reshape(-1, prediction.size(-1))
         padding_mask = padding_mask.reshape(-1)
@@ -107,7 +111,7 @@ class CoordsToLatentSpace(Base):
 
         cross_entropy_loss = self.cross_entropy(filtered_logits, filtered_tokens)
 
-        return cosine_loss + cross_entropy_loss
+        return self.cosine_coefficient * cosine_loss + cross_entropy_loss
 
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]

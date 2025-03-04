@@ -83,7 +83,8 @@ class Trainer:
                 for inputs, ground_truth in train_loader:
                     self.optimizer.zero_grad()
                     outputs = self.strategy((x.to(self.device) for x in inputs))
-                    loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
+                    ground_truth = (x.to(self.device) for x in ground_truth)
+                    loss = self.strategy.compute_loss(outputs, ground_truth)
                     loss.backward()
                     self.optimizer.step()
 
@@ -128,7 +129,7 @@ class Trainer:
     def save_model(self):
         if self.pretrained_model_path:
             directory = os.path.dirname(self.pretrained_model_path)
-            model_path = os.path.join(directory, 'pretrained.pth')
+            model_path = os.path.join(directory, 'finetuned.pth')
         else:
             directory = os.path.join(MAIN_DIR, "models", self.strategy.__class__.__name__,
                                      datetime.now().strftime("%Y%m%d"))

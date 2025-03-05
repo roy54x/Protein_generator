@@ -115,7 +115,8 @@ class Trainer:
 
                     for inputs, ground_truth in val_loader:
                         outputs = self.strategy((x.to(self.device) for x in inputs))
-                        loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
+                        ground_truth = (x.to(self.device) for x in ground_truth)
+                        loss = self.strategy.compute_loss(outputs, ground_truth)
                         total_val_loss += loss.item()
                         total_val_samples += 1
 

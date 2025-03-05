@@ -140,4 +140,5 @@ class CoordsToLatentSpace(Base):
         # Calculate and print the average recovery rate
         recovery_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
         print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
-        return loss, recovery_rate
+        return recovery_rate
+

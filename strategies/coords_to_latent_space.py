@@ -4,7 +4,8 @@ import torch
 import torch.nn.functional as F
 from esm.inverse_folding.gvp_transformer_encoder import GVPTransformerEncoder
 from esm.inverse_folding.util import CoordBatchConverter
-from torch import nn
+from torch import nn, optim
+from transformers import RobertaConfig, RobertaModel
 
 from constants import MAX_TRAINING_SIZE
 from strategies.base import Base
@@ -16,15 +17,31 @@ class CoordsToLatentSpace(Base):
         super(CoordsToLatentSpace, self).__init__()
         pretrained_llm, self.llm_alphabet = esm.pretrained.esm2_t33_650M_UR50D()
         self.lm_head = pretrained_llm.lm_head
-        self.pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
+        for name, param in self.lm_head.named_parameters():
+            param.requires_grad = False
 
+        pretrained_inverse_model, inverse_alphabet = esm.pretrained.esm_if1_gvp4_t16_142M_UR50()
+        self.gvp_transformer_encoder = pretrained_inverse_model.encoder
+        for name, param in self.gvp_transformer_encoder.named_parameters():
+            param.requires_grad = False
         self.inverse_batch_converter = CoordBatchConverter(inverse_alphabet)
-        self.gvp_transformer_encoder = self.pretrained_inverse_model.encoder
-        self.linear = nn.Linear(512, 1280)
-
         self.padding_token = inverse_alphabet.all_toks[inverse_alphabet.padding_idx]
 
-        self.loss_fn = nn.CosineEmbeddingLoss()
+        self.linear = nn.Linear(512, 1280)
+        roberta_config = RobertaConfig(
+            hidden_size=1280,
+            num_hidden_layers=2,
+            num_attention_heads=4,
+            intermediate_size=512
+        )
+        roberta = RobertaModel(roberta_config)
+        self.roberta_encoder = roberta.encoder
+
+        self.softmax = nn.Softmax()
+        self.cross_entropy = nn.CrossEntropyLoss()
+        self.cosine_loss = nn.CosineEmbeddingLoss()
+        self.cosine_coefficient = 10
+
         self.device = "cuda:0"
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
@@ -54,48 +71,65 @@ class CoordsToLatentSpace(Base):
 
         coords, confidence, strs, tokens, padding_mask = self.inverse_batch_converter(
             inverse_batch_converter_input, device=self.device)
+        extra_value = torch.full((*tokens.shape[:-1], 1), self.llm_alphabet.padding_idx,
+                                 dtype=tokens.dtype, device=tokens.device)
+        tokens = torch.cat([tokens, extra_value], dim=-1)
 
-        return (coords, padding_mask, confidence), torch.stack(representations, 0)
+        return (coords, padding_mask, confidence), (torch.stack(representations, 0), tokens)
 
     def forward(self, inputs):
         coords, padding_mask, confidence = inputs
         encoder_out = self.gvp_transformer_encoder(coords, padding_mask, confidence)
         x = encoder_out["encoder_out"][0].transpose(0, 1)
         x = self.linear(x)
-        return x, padding_mask
+        roberta_output = self.roberta_encoder(hidden_states=x,
+                                              attention_mask=~padding_mask[:, None, None, :]).last_hidden_state
+        return roberta_output, padding_mask
 
     def compute_loss(self, outputs, ground_truth):
         prediction, padding_mask = outputs
+        ground_truth_representations, ground_truth_tokens = ground_truth
+        logits = self.softmax(self.lm_head(prediction))
+        num_classes = logits.shape[-1]  # Get the number of classes
+        ground_truth_tokens = torch.clamp(ground_truth_tokens, min=0, max=num_classes - 1)
+
         prediction = prediction.reshape(-1, prediction.size(-1))
-        ground_truth = ground_truth.reshape(-1, ground_truth.size(-1))
         padding_mask = padding_mask.reshape(-1)
+        ground_truth_representations = (ground_truth_representations.
+                                        reshape(-1, ground_truth_representations.size(-1)))
+        ground_truth_tokens = ground_truth_tokens.reshape(-1)
+        logits = logits.reshape(-1, logits.size(-1))
 
         filtered_prediction = prediction[~padding_mask]
-        filtered_ground_truth = ground_truth[~padding_mask]
-
-        # Create target tensor for cosine embedding loss
-        target = torch.ones(filtered_prediction.size(0), device=prediction.device)
+        filtered_representations = ground_truth_representations[~padding_mask]
+        filtered_tokens = ground_truth_tokens[~padding_mask]
+        filtered_logits = logits[~padding_mask]
 
         # Compute the cosine embedding loss
-        loss = self.loss_fn(filtered_prediction, filtered_ground_truth, target)
-        return loss
+        target = torch.ones(filtered_prediction.size(0), device=prediction.device)
+        cosine_loss = self.cosine_loss(filtered_prediction, filtered_representations, target)
+
+        cross_entropy_loss = self.cross_entropy(filtered_logits, filtered_tokens)
+
+        return self.cosine_coefficient * cosine_loss + cross_entropy_loss
 
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]
         chain_id = data["chain_id"]
-        inputs, gt_representations = self.load_inputs_and_ground_truth([data])
+        inputs, gt = self.load_inputs_and_ground_truth([data])
+        gt = (x.to(self.device) for x in gt)
 
         # Get the predicted representation from the model
-        gt_representations = gt_representations.to(self.device)
         self.gvp_transformer_encoder = self.gvp_transformer_encoder.to(self.device)
+        self.to(device=self.device)
         outputs = self(inputs)
-        loss = self.compute_loss(outputs, gt_representations).item()
+        loss = self.compute_loss(outputs, gt).item()
         print(f"Distance in Embedding space is: {loss}")
 
         # Get the predicted sequence based on the decoder
         predicted_representations, padding_mask = outputs
         self.lm_head = self.lm_head.to(self.device)
-        predicted_logits = self.lm_head(predicted_representations[:, 1:len(ground_truth_sequence)+1])
+        predicted_logits = self.lm_head(predicted_representations[:, 1:len(ground_truth_sequence) + 1])
         predicted_indices = torch.argmax(predicted_logits, dim=-1)
         predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
 
@@ -108,5 +142,3 @@ class CoordsToLatentSpace(Base):
         print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
         return recovery_rate
 
-    def get_parameter_count(self):
-        return sum(p.numel() for p in self.gvp_transformer_encoder.parameters() if p.requires_grad)

@@ -1,7 +1,7 @@
 import esm
 import torch
 from esm.inverse_folding.util import CoordBatchConverter
-from torch import nn
+from torch import nn, optim
 from transformers import RobertaConfig, RobertaModel
 
 from constants import MAX_TRAINING_SIZE
@@ -34,7 +34,11 @@ class CoordsToLatentSpace(Base):
         roberta = RobertaModel(roberta_config)
         self.roberta_encoder = roberta.encoder
 
-        self.loss_fn = nn.CosineEmbeddingLoss()
+        self.softmax = nn.Softmax()
+        self.cross_entropy = nn.CrossEntropyLoss()
+        self.cosine_loss = nn.CosineEmbeddingLoss()
+        self.cosine_coefficient = 10
+
         self.device = "cuda:0"
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
@@ -64,8 +68,11 @@ class CoordsToLatentSpace(Base):
 
         coords, confidence, strs, tokens, padding_mask = self.inverse_batch_converter(
             inverse_batch_converter_input, device=self.device)
+        extra_value = torch.full((*tokens.shape[:-1], 1), self.llm_alphabet.padding_idx,
+                                 dtype=tokens.dtype, device=tokens.device)
+        tokens = torch.cat([tokens, extra_value], dim=-1)
 
-        return (coords, padding_mask, confidence), torch.stack(representations, 0)
+        return (coords, padding_mask, confidence), (torch.stack(representations, 0), tokens)
 
     def forward(self, inputs):
         coords, padding_mask, confidence = inputs
@@ -78,31 +85,42 @@ class CoordsToLatentSpace(Base):
 
     def compute_loss(self, outputs, ground_truth):
         prediction, padding_mask = outputs
+        ground_truth_representations, ground_truth_tokens = ground_truth
+        logits = self.softmax(self.lm_head(prediction))
+        num_classes = logits.shape[-1]  # Get the number of classes
+        ground_truth_tokens = torch.clamp(ground_truth_tokens, min=0, max=num_classes - 1)
+
         prediction = prediction.reshape(-1, prediction.size(-1))
-        ground_truth = ground_truth.reshape(-1, ground_truth.size(-1))
         padding_mask = padding_mask.reshape(-1)
+        ground_truth_representations = (ground_truth_representations.
+                                        reshape(-1, ground_truth_representations.size(-1)))
+        ground_truth_tokens = ground_truth_tokens.reshape(-1)
+        logits = logits.reshape(-1, logits.size(-1))
 
         filtered_prediction = prediction[~padding_mask]
-        filtered_ground_truth = ground_truth[~padding_mask]
-
-        # Create target tensor for cosine embedding loss
-        target = torch.ones(filtered_prediction.size(0), device=prediction.device)
+        filtered_representations = ground_truth_representations[~padding_mask]
+        filtered_tokens = ground_truth_tokens[~padding_mask]
+        filtered_logits = logits[~padding_mask]
 
         # Compute the cosine embedding loss
-        loss = self.loss_fn(filtered_prediction, filtered_ground_truth, target)
-        return loss
+        target = torch.ones(filtered_prediction.size(0), device=prediction.device)
+        cosine_loss = self.cosine_loss(filtered_prediction, filtered_representations, target)
+
+        cross_entropy_loss = self.cross_entropy(filtered_logits, filtered_tokens)
+
+        return self.cosine_coefficient * cosine_loss + cross_entropy_loss
 
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]
         chain_id = data["chain_id"]
-        inputs, gt_representations = self.load_inputs_and_ground_truth([data])
+        inputs, gt = self.load_inputs_and_ground_truth([data])
+        gt = (x.to(self.device) for x in gt)
 
         # Get the predicted representation from the model
-        gt_representations = gt_representations.to(self.device)
         self.gvp_transformer_encoder = self.gvp_transformer_encoder.to(self.device)
         self.to(device=self.device)
         outputs = self(inputs)
-        loss = self.compute_loss(outputs, gt_representations).item()
+        loss = self.compute_loss(outputs, gt).item()
         print(f"Distance in Embedding space is: {loss}")
 
         # Get the predicted sequence based on the decoder

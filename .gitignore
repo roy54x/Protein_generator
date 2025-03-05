@@ -3,3 +3,5 @@ pdb_files
 protein_df.csv
 strategies/__pycache__
 utils/__pycache__
+splits.json
+__pycache__/constants.cpython-39.pyc

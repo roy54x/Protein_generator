@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
+from torch import optim
 from torch.utils.data import DataLoader, Dataset
 
 from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_DATAFRAME, BATCH_SIZE, \
@@ -47,7 +48,7 @@ class Trainer:
         self.batch_size = batch_size
         self.val_size = val_size
         self.device = device
-        self.optimizer = torch.optim.Adam(strategy.parameters(), lr=0.001)
+        self.optimizer = optim.Adam(strategy.parameters(), lr=1e-3, weight_decay=1e-4)
         self.best_val_loss = float('inf')
 
         # Collect all file paths from the directory
@@ -83,7 +84,8 @@ class Trainer:
                 for inputs, ground_truth in train_loader:
                     self.optimizer.zero_grad()
                     outputs = self.strategy((x.to(self.device) for x in inputs))
-                    loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
+                    ground_truth = (x.to(self.device) for x in ground_truth)
+                    loss = self.strategy.compute_loss(outputs, ground_truth)
                     loss.backward()
                     self.optimizer.step()
 
@@ -113,7 +115,8 @@ class Trainer:
 
                     for inputs, ground_truth in val_loader:
                         outputs = self.strategy((x.to(self.device) for x in inputs))
-                        loss = self.strategy.compute_loss(outputs, ground_truth.to(self.device))
+                        ground_truth = (x.to(self.device) for x in ground_truth)
+                        loss = self.strategy.compute_loss(outputs, ground_truth)
                         total_val_loss += loss.item()
                         total_val_samples += 1
 
@@ -128,7 +131,7 @@ class Trainer:
     def save_model(self):
         if self.pretrained_model_path:
             directory = os.path.dirname(self.pretrained_model_path)
-            model_path = os.path.join(directory, 'pretrained.pth')
+            model_path = os.path.join(directory, 'finetuned.pth')
         else:
             directory = os.path.join(MAIN_DIR, "models", self.strategy.__class__.__name__,
                                      datetime.now().strftime("%Y%m%d"))

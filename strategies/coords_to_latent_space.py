@@ -116,14 +116,14 @@ class CoordsToLatentSpace(Base):
     def evaluate(self, data):
         ground_truth_sequence = data["sequence"]
         chain_id = data["chain_id"]
-        inputs, gt_representations = self.load_inputs_and_ground_truth([data])
+        inputs, gt = self.load_inputs_and_ground_truth([data])
+        gt = (x.to(self.device) for x in gt)
 
         # Get the predicted representation from the model
-        gt_representations = gt_representations.to(self.device)
         self.gvp_transformer_encoder = self.gvp_transformer_encoder.to(self.device)
         self.to(device=self.device)
         outputs = self(inputs)
-        loss = self.compute_loss(outputs, gt_representations).item()
+        loss = self.compute_loss(outputs, gt).item()
         print(f"Distance in Embedding space is: {loss}")
 
         # Get the predicted sequence based on the decoder

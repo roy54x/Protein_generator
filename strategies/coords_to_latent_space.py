@@ -93,6 +93,8 @@ class CoordsToLatentSpace(Base):
         num_classes = logits.shape[-1]  # Get the number of classes
         ground_truth_tokens = torch.clamp(ground_truth_tokens, min=0, max=num_classes - 1)
 
+        padding_mask[:, 0] = True
+        padding_mask[:, -1] = True
         prediction = prediction.reshape(-1, prediction.size(-1))
         padding_mask = padding_mask.reshape(-1)
         ground_truth_representations = (ground_truth_representations.
@@ -100,8 +102,6 @@ class CoordsToLatentSpace(Base):
         ground_truth_tokens = ground_truth_tokens.reshape(-1)
         logits = logits.reshape(-1, logits.size(-1))
 
-        padding_mask[:, 0] = True
-        padding_mask[:, -1] = True
         filtered_prediction = prediction[~padding_mask]
         filtered_representations = ground_truth_representations[~padding_mask]
         filtered_tokens = ground_truth_tokens[~padding_mask]
@@ -130,12 +130,12 @@ class CoordsToLatentSpace(Base):
         predicted_indices = torch.argmax(logits, dim=-1)
 
         # Get Recovery Rate
+        padding_mask[:, 0] = True
+        padding_mask[:, -1] = True
         padding_mask = padding_mask.reshape(-1)
         ground_truth_tokens = ground_truth_tokens.reshape(-1)
         predicted_indices = predicted_indices.reshape(-1)
 
-        padding_mask[:, 0] = True
-        padding_mask[:, -1] = True
         filtered_tokens = ground_truth_tokens[~padding_mask]
         filtered_indices = predicted_indices[~padding_mask]
         recovery_rate = sum(filtered_indices == filtered_tokens) / len(filtered_tokens)

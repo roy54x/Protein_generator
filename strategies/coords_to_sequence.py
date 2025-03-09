@@ -53,22 +53,22 @@ class CoordsToSequence(Base):
         ll = torch.sum(loss * mask) / torch.sum(mask)
         return ll
 
-    def evaluate(self, data):
-        ground_truth_sequence = data["sequence"]
-        coords = data["coords"]
-        chain_id = data["chain_id"]
+    def evaluate(self, batch_data):
+        inputs, ground_truth = batch_data
+        coords, padding_mask, confidence, prev_output_tokens = inputs
 
-        coords = [[[float('inf') if x is None else x for x in atom]
-                   for atom in residue] for residue in coords]
+        recovery_rates = []
 
-        # Get the predicted sequence from the model
-        predicted_sequence = self.gvp_transformer.sample(coords, temperature=1e-6)
+        for idx, sample_coords in enumerate(coords):
+            sample_coords = sample_coords[~padding_mask[idx]][1:-1]
+            ground_truth = ground_truth[idx][ground_truth[idx] != 1]
+            ground_truth_sequence = "".join(self.alphabet.get_tok(i) for i in ground_truth)
+            predicted_sequence = self.gvp_transformer.sample(sample_coords, temperature=1e-6)
+            correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))
+            total_predictions = len(ground_truth)
+            recovery_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
+            recovery_rates.append(recovery_rate)
 
-        # Compare ground truth and predicted sequence directly using vectorized operations
-        correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))
-        total_predictions = len(ground_truth_sequence)
-
-        # Calculate and print the average recovery rate
-        recovery_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
-        print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
-        return recovery_rate
+        avg_recovery_rate = np.mean(recovery_rates)
+        print(f"Recovery rate: {avg_recovery_rate}")
+        return avg_recovery_rate

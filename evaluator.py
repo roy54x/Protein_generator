@@ -3,35 +3,42 @@ import os.path
 
 import pandas as pd
 import torch
+from numpy import average
+from scipy.stats import pearsonr
 
-from constants import MAIN_DIR, PRETRAINED_MODEL_PATH
-from strategies.contact_map_to_sequence import ContactMapToSequence
+import os
+import torch
+import pandas as pd
+from scipy.stats import pearsonr
+
+from constants import MAIN_DIR, PRETRAINED_MODEL_PATH, BATCH_SIZE
 from strategies.coords_to_latent_space import CoordsToLatentSpace
-from strategies.coords_to_sequence import CoordsToSequence
-from strategies.sequence_to_distogram import SequenceToDistogram
+from trainer import get_dataloader
+
+
+def average(lst):
+    return sum(lst) / len(lst) if lst else 0
 
 if __name__ == '__main__':
-    strategy = CoordsToSequence()
-
+    directory = os.path.join(MAIN_DIR, "cath_data/test_set")
+    strategy = CoordsToLatentSpace()
     model_path = os.path.join(MAIN_DIR, PRETRAINED_MODEL_PATH)
-    state_dict = torch.load(model_path)
-    strategy.load_state_dict(state_dict)
+
+    strategy.load_state_dict(torch.load(model_path))
     strategy.eval()
 
-    cath_json_file = os.path.join(MAIN_DIR, "cath_data", "cath_data.json")
-    cath_df = pd.read_json(cath_json_file)
-    cath_df = cath_df[cath_df["dataset"] == "test"]
-    print(f"Number of sequences in the test set is: {len(cath_df)}")
+    results = []
+    file_paths = [os.path.join(directory, fname) for fname in os.listdir(directory) if fname.endswith('.json')]
+    for file_path in file_paths:
 
-    total_recovery_rate = 0
-    total_sequences = 0
-    for i, data in cath_df.iterrows():
-        recovery_rate = strategy.evaluate(data)
+        test_loader = get_dataloader(file_path, strategy, BATCH_SIZE, mode="test")
 
-        if recovery_rate:
-            total_recovery_rate += recovery_rate
-            total_sequences += 1
+        for batch_data in test_loader:
+            metric_output = strategy.evaluate(batch_data)
+            if metric_output is not None:
+                results.append(metric_output)
 
-    # Calculate the average recovery rate over all sequences
-    average_recovery_rate = total_recovery_rate / total_sequences if total_sequences > 0 else 0
-    print(f"Overall average recovery rate: {average_recovery_rate:.4f}")
+    avg_result = average(results)
+
+    print(f"Overall average result: {avg_result:.4f}")
+

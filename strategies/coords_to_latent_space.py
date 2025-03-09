@@ -37,7 +37,7 @@ class CoordsToLatentSpace(Base):
         roberta = RobertaModel(roberta_config)
         self.roberta_encoder = roberta.encoder
 
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=-1)
         self.cross_entropy = nn.CrossEntropyLoss()
         self.cosine_loss = nn.CosineEmbeddingLoss()
         self.cosine_coefficient = 10
@@ -100,6 +100,8 @@ class CoordsToLatentSpace(Base):
         ground_truth_tokens = ground_truth_tokens.reshape(-1)
         logits = logits.reshape(-1, logits.size(-1))
 
+        padding_mask[:, 0] = True
+        padding_mask[:, -1] = True
         filtered_prediction = prediction[~padding_mask]
         filtered_representations = ground_truth_representations[~padding_mask]
         filtered_tokens = ground_truth_tokens[~padding_mask]
@@ -113,32 +115,31 @@ class CoordsToLatentSpace(Base):
 
         return self.cosine_coefficient * cosine_loss + cross_entropy_loss
 
-    def evaluate(self, data):
-        ground_truth_sequence = data["sequence"]
-        chain_id = data["chain_id"]
-        inputs, gt = self.load_inputs_and_ground_truth([data])
-        gt = (x.to(self.device) for x in gt)
+    def evaluate(self, batch_data):
+        # Load batched inputs and ground truths
+        inputs, ground_truth = batch_data
+        ground_truth_representations, ground_truth_tokens = ground_truth
 
         # Get the predicted representation from the model
         self.gvp_transformer_encoder = self.gvp_transformer_encoder.to(self.device)
+        self.lm_head = self.lm_head.to(self.device)
         self.to(device=self.device)
         outputs = self(inputs)
-        loss = self.compute_loss(outputs, gt).item()
-        print(f"Distance in Embedding space is: {loss}")
+        prediction, padding_mask = outputs
+        logits = self.softmax(self.lm_head(prediction))
+        predicted_indices = torch.argmax(logits, dim=-1)
 
-        # Get the predicted sequence based on the decoder
-        predicted_representations, padding_mask = outputs
-        self.lm_head = self.lm_head.to(self.device)
-        predicted_logits = self.lm_head(predicted_representations[:, 1:len(ground_truth_sequence) + 1])
-        predicted_indices = torch.argmax(predicted_logits, dim=-1)
-        predicted_sequence = ''.join([self.llm_alphabet.get_tok(i) for i in predicted_indices.squeeze().tolist()])
+        # Get Recovery Rate
+        padding_mask = padding_mask.reshape(-1)
+        ground_truth_tokens = ground_truth_tokens.reshape(-1)
+        predicted_indices = predicted_indices.reshape(-1)
 
-        # Compare ground truth and predicted sequence directly using vectorized operations
-        correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))
-        total_predictions = len(ground_truth_sequence)
+        padding_mask[:, 0] = True
+        padding_mask[:, -1] = True
+        filtered_tokens = ground_truth_tokens[~padding_mask]
+        filtered_indices = predicted_indices[~padding_mask]
+        recovery_rate = sum(filtered_indices == filtered_tokens) / len(filtered_tokens)
 
-        # Calculate and print the average recovery rate
-        recovery_rate = correct_predictions / total_predictions if total_predictions > 0 else 0
-        print(f"Recovery rate for protein: {chain_id} is {recovery_rate}")
+        print(f"Recovery rate: is {recovery_rate}")
+
         return recovery_rate
-

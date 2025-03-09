@@ -33,6 +33,16 @@ class CustomDataset(Dataset):
         return inputs, ground_truth
 
 
+def get_dataloader(file_path, strategy, batch_size, mode):
+    dataframe = pd.read_json(file_path)
+    dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) >= MIN_SIZE)]
+    dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) <= MAX_SIZE)]
+    dataframe = dataframe[dataframe['sequence'].apply(lambda seq: all(char in AMINO_ACIDS for char in seq))]
+    dataset = CustomDataset(dataframe, strategy)
+    return DataLoader(dataset, batch_size=batch_size,
+                          shuffle=(mode == "train"), collate_fn=dataset.collate_fn)
+
+
 class Trainer:
     def __init__(self, directory, strategy, batch_size=32, val_size=0.2, device="cuda:0", pretrained_model_path=""):
         self.directory = directory
@@ -61,15 +71,6 @@ class Trainer:
         print(f"number of samples in the val set are: {self.val_size}")
         print(f'Number of trainable parameters: {self.strategy.get_parameter_count()}')
 
-    def get_dataloader(self, file_path, mode):
-        dataframe = pd.read_json(file_path)
-        dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) >= MIN_SIZE)]
-        dataframe = dataframe[dataframe['sequence'].apply(lambda seq: len(seq) <= MAX_SIZE)]
-        dataframe = dataframe[dataframe['sequence'].apply(lambda seq: all(char in AMINO_ACIDS for char in seq))]
-        dataset = CustomDataset(dataframe, self.strategy)
-        return DataLoader(dataset, batch_size=self.batch_size,
-                          shuffle=(mode == "train"), collate_fn=dataset.collate_fn)
-
     def train(self, epochs=100):
         for epoch in range(epochs):
             batch_count = 0
@@ -79,7 +80,7 @@ class Trainer:
             self.strategy.train()
 
             for train_file in self.train_files:
-                train_loader = self.get_dataloader(train_file, mode="train")
+                train_loader = get_dataloader(train_file, self.strategy, self.batch_size, mode="train")
 
                 for inputs, ground_truth in train_loader:
                     self.optimizer.zero_grad()
@@ -111,7 +112,7 @@ class Trainer:
             with torch.no_grad():
 
                 for val_file in self.val_files:
-                    val_loader = self.get_dataloader(val_file, mode="val")
+                    val_loader = get_dataloader(val_file, self.strategy, self.batch_size, mode="val")
 
                     for inputs, ground_truth in val_loader:
                         outputs = self.strategy((x.to(self.device) for x in inputs))

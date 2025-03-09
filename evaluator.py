@@ -1,6 +1,7 @@
 import json
 import os.path
 
+import numpy as np
 import pandas as pd
 import torch
 from numpy import average
@@ -13,15 +14,13 @@ from scipy.stats import pearsonr
 
 from constants import MAIN_DIR, PRETRAINED_MODEL_PATH, BATCH_SIZE
 from strategies.coords_to_latent_space import CoordsToLatentSpace
+from strategies.coords_to_sequence import CoordsToSequence
 from trainer import get_dataloader
 
 
-def average(lst):
-    return sum(lst) / len(lst) if lst else 0
-
 if __name__ == '__main__':
     directory = os.path.join(MAIN_DIR, "cath_data/test_set")
-    strategy = CoordsToLatentSpace()
+    strategy = CoordsToSequence()
     model_path = os.path.join(MAIN_DIR, PRETRAINED_MODEL_PATH)
 
     strategy.load_state_dict(torch.load(model_path))
@@ -38,7 +37,7 @@ if __name__ == '__main__':
             if metric_output is not None:
                 results.append(metric_output)
 
-    avg_result = average(results)
+    avg_result = np.mean(results)
 
     print(f"Overall average result: {avg_result:.4f}")
 

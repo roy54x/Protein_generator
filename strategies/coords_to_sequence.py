@@ -61,8 +61,8 @@ class CoordsToSequence(Base):
 
         for idx, sample_coords in enumerate(coords):
             sample_coords = sample_coords[~padding_mask[idx]][1:-1]
-            ground_truth = ground_truth[idx][ground_truth[idx] != 1]
-            ground_truth_sequence = "".join(self.alphabet.get_tok(i) for i in ground_truth)
+            ground_truth_i = ground_truth[idx][ground_truth[idx] != 1]
+            ground_truth_sequence = "".join(self.alphabet.get_tok(i) for i in ground_truth_i)
             predicted_sequence = self.gvp_transformer.sample(sample_coords, temperature=1e-6)
             correct_predictions = sum(a == b for a, b in zip(predicted_sequence, ground_truth_sequence))
             total_predictions = len(ground_truth)

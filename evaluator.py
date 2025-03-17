@@ -20,7 +20,7 @@ from trainer import get_dataloader
 
 if __name__ == '__main__':
     directory = os.path.join(MAIN_DIR, "cath_data/test_set")
-    strategy = CoordsToSequence()
+    strategy = CoordsToLatentSpace()
     model_path = os.path.join(MAIN_DIR, PRETRAINED_MODEL_PATH)
 
     strategy.load_state_dict(torch.load(model_path))

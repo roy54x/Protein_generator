@@ -129,17 +129,23 @@ class CoordsToLatentSpace(Base):
         logits = self.softmax(self.lm_head(prediction))
         predicted_indices = torch.argmax(logits, dim=-1)
 
-        # Get Recovery Rate
         padding_mask[:, 0] = True
         padding_mask[:, -1] = True
-        padding_mask = padding_mask.reshape(-1)
-        ground_truth_tokens = ground_truth_tokens.reshape(-1)
-        predicted_indices = predicted_indices.reshape(-1)
 
-        filtered_tokens = ground_truth_tokens[~padding_mask]
-        filtered_indices = predicted_indices[~padding_mask]
-        recovery_rate = sum(filtered_indices == filtered_tokens) / len(filtered_tokens)
+        per_sequence_recovery = []
+        for i in range(predicted_indices.shape[0]):
+            valid_mask = ~padding_mask[i]
+            filtered_tokens = ground_truth_tokens[i][valid_mask]
+            filtered_indices = predicted_indices[i][valid_mask]
 
-        print(f"Recovery rate: is {recovery_rate}")
+            if len(filtered_tokens) > 0:
+                recovery = (filtered_indices == filtered_tokens).float().mean()
+                per_sequence_recovery.append(recovery)
 
-        return recovery_rate
+        # Compute mean across sequences
+        recovery_rate = torch.stack(per_sequence_recovery).mean() \
+            if per_sequence_recovery else torch.tensor(0.0)
+
+        print(f"Recovery rate: {recovery_rate.item():.4f}")
+
+        return recovery_rate.item()

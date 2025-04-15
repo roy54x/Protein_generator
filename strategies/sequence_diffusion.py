@@ -6,43 +6,13 @@ import torch.nn as nn
 
 from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX, PAD_IDX, INDEX_TO_AMINO_ACID
 from strategies.base import Base
-
-
-def get_blosum_probability_function(temp=1):
-    """Returns a function that takes two amino acids and returns their normalized BLOSUM62 probability (0-1)."""
-    # Load BLOSUM62 matrix
-    matrix = bl.BLOSUM(62)
-
-    # Get ordered list of amino acids
-    amino_acids = sorted(matrix.keys())
-    aa_index = {aa: i for i, aa in enumerate(amino_acids)}
-
-    # Create score matrix
-    scores = np.array([[matrix[a][b] for b in amino_acids] for a in amino_acids])
-    scaled_scores = scores / temp
-
-    # Apply softmax row-wise to each row in the scores matrix
-    probabilities = np.apply_along_axis(lambda x: sp.softmax(x), axis=1, arr=scaled_scores)
-
-    # Create lookup function with validation
-    def get_prob(aa1, aa2):
-        if aa1 not in aa_index or aa2 not in aa_index:
-            valid_aas = ", ".join(aa_index.keys())
-            raise ValueError(f"Invalid amino acid. Use: {valid_aas}")
-
-        i = aa_index[aa1]
-        j = aa_index[aa2]
-        return float(probabilities[i, j])
-
-    return get_prob
-
-
-blosum_probs = get_blosum_probability_function()
+from utils.utils import get_blosum_probability_function
 
 
 class RobertaBlock(nn.Module):
     def __init__(self, vocab_size, hidden_dim=128, num_layers=2, num_heads=4):
         super().__init__()
+        self.blosum_probs = get_blosum_probability_function()
         self.embedding = nn.Embedding(vocab_size, hidden_dim, padding_idx=PAD_IDX)
         encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=num_heads, batch_first=True)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
@@ -69,22 +39,6 @@ class SequenceDiffusion(Base):
 
     def add_noise(self, sequence):
         sequence = sequence.copy()
-        valid_len = len([aa for aa in sequence if aa != PAD_IDX])
-
-        if valid_len == 0:
-            return sequence
-
-        idx = np.random.randint(valid_len)
-        aa_idx = sequence[idx]
-        aa = INDEX_TO_AMINO_ACID.get(aa_idx, None)
-
-        if aa and aa in blosum_probs:
-            aas, probs = blosum_probs[aa]
-            new_aa = np.random.choice(aas, p=probs)
-            sequence[idx] = AMINO_ACID_TO_INDEX.get(new_aa, aa_idx)
-
-        # Optional: insertion/deletion for padding effect
-        # (same as before...)
 
         return sequence
 

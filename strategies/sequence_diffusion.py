@@ -1,16 +1,14 @@
+import blosum as bl
 import numpy as np
+import scipy.special as sp
 import torch
 import torch.nn as nn
-import blosum as bl
-import scipy.special as sp
-from matplotlib import pyplot as plt
-import seaborn as sns
 
 from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX, PAD_IDX, INDEX_TO_AMINO_ACID
 from strategies.base import Base
 
 
-def get_blosum_probability_function():
+def get_blosum_probability_function(temp=1):
     """Returns a function that takes two amino acids and returns their normalized BLOSUM62 probability (0-1)."""
     # Load BLOSUM62 matrix
     matrix = bl.BLOSUM(62)
@@ -21,9 +19,10 @@ def get_blosum_probability_function():
 
     # Create score matrix
     scores = np.array([[matrix[a][b] for b in amino_acids] for a in amino_acids])
+    scaled_scores = scores / temp
 
     # Apply softmax row-wise to each row in the scores matrix
-    probabilities = np.apply_along_axis(lambda x: sp.softmax(x), axis=1, arr=scores)
+    probabilities = np.apply_along_axis(lambda x: sp.softmax(x), axis=1, arr=scaled_scores)
 
     # Create lookup function with validation
     def get_prob(aa1, aa2):

@@ -1,12 +1,14 @@
 MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
 PRETRAINED_MODEL_PATH = r"models\CoordsToLatentSpace\20250301\finetuned.pth"
 
-NUM_SAMPLES_IN_DATAFRAME = 100
+NUM_SAMPLES_IN_DATAFRAME = 100000
 
 AMINO_ACIDS = ['<null_0>', '<pad>', '<eos>', '<unk>', 'L', 'A', 'G', 'V', 'S', 'E',
                'R', 'T', 'I', 'D', 'P', 'K', 'Q', 'N', 'F', 'Y', 'M', 'H', 'W', 'C',
                'X', 'B', 'U', 'Z', 'O', '.', '-', '<null_1>', '<mask>', '<cath>', '<af2>']
 AMINO_ACID_TO_INDEX = {aa: i for i, aa in enumerate(AMINO_ACIDS)}
+INDEX_TO_AMINO_ACID = {i: aa for i, aa in enumerate(AMINO_ACIDS)}
+PAD_IDX = AMINO_ACID_TO_INDEX['<pad>']
 
 MIN_SIZE = 3
 MAX_TRAINING_SIZE = 250

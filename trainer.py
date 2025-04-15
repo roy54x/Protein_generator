@@ -14,6 +14,7 @@ from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_
 from strategies.contact_map_to_sequence import ContactMapToSequence
 from strategies.coords_to_latent_space import CoordsToLatentSpace
 from strategies.coords_to_sequence import CoordsToSequence
+from strategies.sequence_diffusion import SequenceDiffusion
 from strategies.sequence_to_distogram import SequenceToDistogram
 
 
@@ -145,9 +146,9 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    data_path = os.path.join(MAIN_DIR, "cath_data/train_set")
+    data_path = os.path.join(MAIN_DIR, "absd_data/data")
     pretrained_model_path = os.path.join(MAIN_DIR, PRETRAINED_MODEL_PATH)
-    strategy = CoordsToLatentSpace()
+    strategy = SequenceDiffusion()
     trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, val_size=0.15,
                       pretrained_model_path=pretrained_model_path)
     trainer.train(epochs=10000)

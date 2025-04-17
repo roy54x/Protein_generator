@@ -2,24 +2,11 @@ import random
 
 import torch
 import torch.nn as nn
+from transformers import RobertaModel, RobertaTokenizer
 
 from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX, PAD_IDX
 from strategies.base import Base
 from utils.utils import get_blosum_probability_function
-
-
-class RobertaBlock(nn.Module):
-    def __init__(self, vocab_size, hidden_dim=128, num_layers=2, num_heads=4):
-        super().__init__()
-        self.embedding = nn.Embedding(vocab_size, hidden_dim, padding_idx=PAD_IDX)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=num_heads, batch_first=True)
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.output = nn.Linear(hidden_dim, vocab_size)
-
-    def forward(self, x):
-        x = self.embedding(x)
-        x = self.transformer(x)
-        return self.output(x)
 
 
 class SequenceDiffusion(Base):
@@ -29,10 +16,10 @@ class SequenceDiffusion(Base):
         self.aa_to_idx = {aa: i for i, aa in enumerate(self.aa_list)}
         self.idx_to_aa = {i: aa for aa, i in self.aa_to_idx.items()}
 
-        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.vocab_size = len(AMINO_ACID_TO_INDEX)
-        self.model = RobertaBlock(self.vocab_size).to(self.device)
+        self.roberta = RobertaModel.from_pretrained("roberta-base")
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     def pad_sequence(self, sequence):
         tokenized = [AMINO_ACID_TO_INDEX.get(aa, PAD_IDX) for aa in sequence]
@@ -67,27 +54,33 @@ class SequenceDiffusion(Base):
         noised_sequences = []
 
         for data in batch_data:
+            sequence = data['sequence']
             noised_seq = self.add_noise(data['sequence'])
 
-            sequences.append(torch.tensor(original_seq, dtype=torch.long))
-            noised_sequences.append(torch.tensor(noised_seq, dtype=torch.long))
+            sequences.append(torch.tensor(self.pad_sequence(sequence), dtype=torch.long))
+            noised_sequences.append(torch.tensor(self.pad_sequence(noised_seq), dtype=torch.long))
 
         sequences = torch.stack(sequences).to(self.device)
         noised_sequences = torch.stack(noised_sequences).to(self.device)
 
         return noised_sequences, sequences
 
-    def forward(self, inputs):
-        return self.model(inputs)
+    def forward(self, noised_sequences):
+        """
+        Forward pass to reconstruct the original sequence from the noised input.
+        """
+        # (batch_size, seq_len)
+        embeddings = self.roberta.embeddings(input_ids=noised_sequences)
+        outputs = self.roberta.encoder(embeddings)
+        hidden_states = outputs[0]  # (batch_size, seq_len, hidden_size)
+        logits = self.roberta.lm_head(hidden_states)
+        return logits
 
     def compute_loss(self, outputs, ground_truth):
-        # outputs: (batch_size, seq_len, vocab_size)
-        # ground_truth: (batch_size, seq_len)
         return self.loss_fn(outputs.view(-1, self.vocab_size), ground_truth.view(-1))
 
     def evaluate(self, batch_data):
-        inputs, targets = self.load_inputs_and_ground_truth(batch_data)
-        with torch.no_grad():
-            outputs = self.forward(inputs)
-            loss = self.compute_loss(outputs, targets)
-        return loss.item()
+        noised_sequences, ground_truth = self.load_inputs_and_ground_truth(batch_data)
+        outputs = self.forward(noised_sequences)
+        loss = self.compute_loss(outputs, ground_truth)
+        return loss

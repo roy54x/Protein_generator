@@ -54,24 +54,28 @@ class SequenceDiffusion(Base):
     def load_inputs_and_ground_truth(self, batch_data, end=None):
         sequences = []
         noised_sequences = []
+        timesteps = []
 
         for data in batch_data:
-            sequence = data['sequence']
-            noised_seq = self.add_noise(data['sequence'])
+            t = random.randint(1, 5)
+            noised_seq = self.add_noise(data['sequence'], t=t)
 
-            sequences.append(torch.tensor(self.pad_sequence(sequence), dtype=torch.long))
+            sequences.append(torch.tensor(self.pad_sequence(data['sequence']), dtype=torch.long))
             noised_sequences.append(torch.tensor(self.pad_sequence(noised_seq), dtype=torch.long))
+            timesteps.append(t)
 
         sequences = torch.stack(sequences).to(self.device)
         noised_sequences = torch.stack(noised_sequences).to(self.device)
+        timesteps = torch.tensor(timesteps, dtype=torch.long).to(self.device)
 
-        return noised_sequences, sequences
+        return (noised_sequences, timesteps), sequences
 
     def forward(self, inputs):
         """
         Forward pass to reconstruct the original sequence from the noised input.
         """
-        embeddings = self.roberta.embeddings(input_ids=inputs)
+        (noised_sequences, timesteps) = inputs
+        embeddings = self.roberta.embeddings(input_ids=noised_sequences)
         outputs = self.roberta.encoder(embeddings)
         hidden_states = outputs[0]  # (batch_size, seq_len, hidden_size)
         logits = self.lm_head(hidden_states)

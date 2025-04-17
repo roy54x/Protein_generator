@@ -12,29 +12,26 @@ def normalize(x, epsilon=1e-2):
 
 
 def get_blosum_probability_function(temp=1.0):
-    """Returns a function that takes two amino acids and returns their normalized BLOSUM62 probability (0-1)."""
+    """Returns:
+    - `get_prob_vec(aa)` to return the full probability vector of swapping `aa` with others.
+    - `aa_list`: list of amino acids corresponding to indices in the vector.
+    """
     # Load BLOSUM62 matrix
     matrix = bl.BLOSUM(62)
 
-    # Get ordered list of amino acids
-    amino_acids = sorted(matrix.keys())
+    # Sorted amino acids list
+    amino_acids = list(matrix.keys())
     aa_index = {aa: i for i, aa in enumerate(amino_acids)}
 
-    # Create score matrix
+    # Compute score matrix and softmax
     scores = np.array([[matrix[a][b] for b in amino_acids] for a in amino_acids])
     scaled_scores = scores / temp
+    probabilities = sp.softmax(scaled_scores, axis=1)
 
-    # Apply softmax row-wise to each row in the scores matrix
-    probabilities = np.apply_along_axis(lambda x: sp.softmax(x), axis=1, arr=scaled_scores)
+    # Function to return the full vector of probabilities
+    def get_prob_vec(aa):
+        if aa not in aa_index:
+            raise ValueError(f"Invalid amino acid: {aa}")
+        return probabilities[aa_index[aa]]  # Shape: (20,)
 
-    # Create lookup function with validation
-    def get_prob(aa1, aa2):
-        if aa1 not in aa_index or aa2 not in aa_index:
-            valid_aas = ", ".join(aa_index.keys())
-            raise ValueError(f"Invalid amino acid. Use: {valid_aas}")
-
-        i = aa_index[aa1]
-        j = aa_index[aa2]
-        return float(probabilities[i, j])
-
-    return get_prob
+    return get_prob_vec, amino_acids

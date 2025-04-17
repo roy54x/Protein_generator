@@ -49,7 +49,7 @@ class Trainer:
         self.directory = directory
         self.strategy = strategy.to(device)
         self.pretrained_model_path = pretrained_model_path
-        if os.path.exists(self.pretrained_model_path):
+        if os.path.exists(self.pretrained_model_path) and self.pretrained_model_path.endswith(".pth"):
             model = torch.load(pretrained_model_path)
             self.strategy.load_state_dict(model)
         else:

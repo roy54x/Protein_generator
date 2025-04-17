@@ -1,10 +1,9 @@
-import blosum as bl
-import numpy as np
-import scipy.special as sp
+import random
+
 import torch
 import torch.nn as nn
 
-from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX, PAD_IDX, INDEX_TO_AMINO_ACID
+from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX, PAD_IDX
 from strategies.base import Base
 from utils.utils import get_blosum_probability_function
 
@@ -12,7 +11,6 @@ from utils.utils import get_blosum_probability_function
 class RobertaBlock(nn.Module):
     def __init__(self, vocab_size, hidden_dim=128, num_layers=2, num_heads=4):
         super().__init__()
-        self.blosum_probs = get_blosum_probability_function()
         self.embedding = nn.Embedding(vocab_size, hidden_dim, padding_idx=PAD_IDX)
         encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=num_heads, batch_first=True)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
@@ -27,8 +25,12 @@ class RobertaBlock(nn.Module):
 class SequenceDiffusion(Base):
     def __init__(self):
         super().__init__()
+        self.get_prob_vec, self.aa_list = get_blosum_probability_function()
+        self.aa_to_idx = {aa: i for i, aa in enumerate(self.aa_list)}
+        self.idx_to_aa = {i: aa for aa, i in self.aa_to_idx.items()}
+
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.vocab_size = len(AMINO_ACID_TO_INDEX)  # Size based on AMINO_ACID_TO_INDEX
+        self.vocab_size = len(AMINO_ACID_TO_INDEX)
         self.model = RobertaBlock(self.vocab_size).to(self.device)
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
 
@@ -37,18 +39,35 @@ class SequenceDiffusion(Base):
         padded = tokenized[:MAX_TRAINING_SIZE] + [PAD_IDX] * (MAX_TRAINING_SIZE - len(tokenized))
         return padded
 
-    def add_noise(self, sequence):
-        sequence = sequence.copy()
+    def add_noise(self, sequence, t=1, reduce_odds=0.25, addition_odds=0.75):
+        """sequence: list of amino acid **letters**"""
+        s = list(sequence)
 
-        return sequence
+        for _ in range(t):
+            # For all valid amino acids, get their prob vectors
+            prob_vectors = [self.get_prob_vec(aa) for aa in s]
+            prob_tensor = torch.tensor(prob_vectors)  # (n_valid, vocab_size)
+
+            # Sample replacements
+            replacements = torch.multinomial(prob_tensor, num_samples=1).squeeze(-1)
+            s = "".join([self.aa_list[idx] for idx in replacements])
+
+            # Randomly remove one AA from end
+            if len(s) > 0 and random.random() < reduce_odds:
+                s = s[:-1]
+
+            # Randomly add one AA to end
+            if random.random() < addition_odds:
+                s = s + random.choice(self.aa_list)
+
+        return s
 
     def load_inputs_and_ground_truth(self, batch_data, end=None):
         sequences = []
         noised_sequences = []
 
         for data in batch_data:
-            original_seq = self.pad_sequence(data['sequence'])
-            noised_seq = self.add_noise(original_seq)
+            noised_seq = self.add_noise(data['sequence'])
 
             sequences.append(torch.tensor(original_seq, dtype=torch.long))
             noised_sequences.append(torch.tensor(noised_seq, dtype=torch.long))

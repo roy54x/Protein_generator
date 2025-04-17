@@ -84,9 +84,17 @@ class Trainer:
                 train_loader = get_dataloader(train_file, self.strategy, self.batch_size, mode="train")
 
                 for inputs, ground_truth in train_loader:
+                    if isinstance(inputs, tuple):
+                        inputs = tuple(x.to(self.device) for x in inputs)
+                    else:
+                        inputs = inputs.to(self.device)
+                    if isinstance(inputs, tuple):
+                        ground_truth = tuple(x.to(self.device) for x in ground_truth)
+                    else:
+                        ground_truth = ground_truth.to(self.device)
+
                     self.optimizer.zero_grad()
-                    outputs = self.strategy((x.to(self.device) for x in inputs))
-                    ground_truth = (x.to(self.device) for x in ground_truth)
+                    outputs = self.strategy(inputs)
                     loss = self.strategy.compute_loss(outputs, ground_truth)
                     loss.backward()
                     self.optimizer.step()
@@ -116,8 +124,17 @@ class Trainer:
                     val_loader = get_dataloader(val_file, self.strategy, self.batch_size, mode="val")
 
                     for inputs, ground_truth in val_loader:
-                        outputs = self.strategy((x.to(self.device) for x in inputs))
-                        ground_truth = (x.to(self.device) for x in ground_truth)
+                        if isinstance(inputs, tuple):
+                            inputs = tuple(x.to(self.device) for x in inputs)
+                        else:
+                            inputs = inputs.to(self.device)
+                        if isinstance(inputs, tuple):
+                            ground_truth = tuple(x.to(self.device) for x in ground_truth)
+                        else:
+                            ground_truth = ground_truth.to(self.device)
+
+                        self.optimizer.zero_grad()
+                        outputs = self.strategy(inputs)
                         loss = self.strategy.compute_loss(outputs, ground_truth)
                         total_val_loss += loss.item()
                         total_val_samples += 1

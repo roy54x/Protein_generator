@@ -1,5 +1,6 @@
 import random
 
+import numpy as np
 import torch
 import torch.nn as nn
 from transformers import RobertaModel, RobertaTokenizer
@@ -18,6 +19,7 @@ class SequenceDiffusion(Base):
 
         self.vocab_size = len(AMINO_ACID_TO_INDEX)
         self.roberta = RobertaModel.from_pretrained("roberta-base")
+        self.lm_head = nn.Linear(self.roberta.config.hidden_size, self.vocab_size)
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -65,15 +67,14 @@ class SequenceDiffusion(Base):
 
         return noised_sequences, sequences
 
-    def forward(self, noised_sequences):
+    def forward(self, inputs):
         """
         Forward pass to reconstruct the original sequence from the noised input.
         """
-        # (batch_size, seq_len)
-        embeddings = self.roberta.embeddings(input_ids=noised_sequences)
+        embeddings = self.roberta.embeddings(input_ids=inputs)
         outputs = self.roberta.encoder(embeddings)
         hidden_states = outputs[0]  # (batch_size, seq_len, hidden_size)
-        logits = self.roberta.lm_head(hidden_states)
+        logits = self.lm_head(hidden_states)
         return logits
 
     def compute_loss(self, outputs, ground_truth):

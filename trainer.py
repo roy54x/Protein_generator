@@ -128,7 +128,7 @@ class Trainer:
                             inputs = tuple(x.to(self.device) for x in inputs)
                         else:
                             inputs = inputs.to(self.device)
-                        if isinstance(inputs, tuple):
+                        if isinstance(ground_truth, tuple):
                             ground_truth = tuple(x.to(self.device) for x in ground_truth)
                         else:
                             ground_truth = ground_truth.to(self.device)

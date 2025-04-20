@@ -16,9 +16,10 @@ class SequenceDiffusion(Base):
         self.get_prob_vec, self.aa_list = get_blosum_probability_function()
         self.aa_to_idx = {aa: i for i, aa in enumerate(self.aa_list)}
         self.idx_to_aa = {i: aa for aa, i in self.aa_to_idx.items()}
+        self.noise_levels = 3
 
         self.vocab_size = len(AMINO_ACID_TO_INDEX)
-        self.roberta = RobertaModel.from_pretrained("roberta-base")
+        self.roberta = RobertaModel.from_pretrained("distilroberta-base")
         self.lm_head = nn.Linear(self.roberta.config.hidden_size, self.vocab_size)
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -35,7 +36,7 @@ class SequenceDiffusion(Base):
         for _ in range(t):
             # For all valid amino acids, get their prob vectors
             prob_vectors = [self.get_prob_vec(aa) for aa in s]
-            prob_tensor = torch.tensor(prob_vectors)  # (n_valid, vocab_size)
+            prob_tensor = torch.tensor(np.stack(prob_vectors))  # (n_valid, vocab_size)
 
             # Sample replacements
             replacements = torch.multinomial(prob_tensor, num_samples=1).squeeze(-1)
@@ -51,18 +52,21 @@ class SequenceDiffusion(Base):
 
         return s
 
-    def load_inputs_and_ground_truth(self, batch_data, end=None):
+    def load_inputs_and_ground_truth(self, batch_data, t=None):
         sequences = []
         noised_sequences = []
         timesteps = []
 
         for data in batch_data:
-            t = random.randint(1, 5)
-            noised_seq = self.add_noise(data['sequence'], t=t)
+            timestep = (
+                random.randint(1, self.noise_levels)
+                if self.training or t is None else t
+            )
+            noised_seq = self.add_noise(data['sequence'], t=timestep)
 
             sequences.append(torch.tensor(self.pad_sequence(data['sequence']), dtype=torch.long))
             noised_sequences.append(torch.tensor(self.pad_sequence(noised_seq), dtype=torch.long))
-            timesteps.append(t)
+            timesteps.append(timestep)
 
         sequences = torch.stack(sequences).to(self.device)
         noised_sequences = torch.stack(noised_sequences).to(self.device)
@@ -85,7 +89,35 @@ class SequenceDiffusion(Base):
         return self.loss_fn(outputs.view(-1, self.vocab_size), ground_truth.view(-1))
 
     def evaluate(self, batch_data):
-        noised_sequences, ground_truth = self.load_inputs_and_ground_truth(batch_data)
-        outputs = self.forward(noised_sequences)
-        loss = self.compute_loss(outputs, ground_truth)
-        return loss
+        recovery_stats = {t: {'correct': 0, 'total': 0} for t in range(1, self.noise_levels + 1)}
+
+        self.eval()  # Ensure model is in eval mode
+
+        for t in range(1, self.noise_levels + 1):
+            inputs, sequences = self.load_inputs_and_ground_truth(batch_data, t=t)
+            noised_sequences, timesteps = inputs
+
+            outputs = self.forward((noised_sequences, timesteps))
+            predictions = outputs.argmax(dim=-1)
+
+            mask = sequences != PAD_IDX
+            correct = (predictions == sequences) & mask
+            total_correct = correct.sum().item()
+            total_tokens = mask.sum().item()
+
+            recovery_stats[t]['correct'] += total_correct
+            recovery_stats[t]['total'] += total_tokens
+
+        recovery_rates = {
+            t: (recovery_stats[t]['correct'] / recovery_stats[t]['total']) if recovery_stats[t]['total'] > 0 else 0.0
+            for t in recovery_stats
+        }
+
+        # Print recovery rates per noise level
+        print("Recovery Rates by Noise Level:")
+        for t in sorted(recovery_rates):
+            print(f"  Noise level {t}: {recovery_rates[t]:.4f}")
+
+        # Return the average across all noise levels
+        avg_recovery = np.mean(list(recovery_rates.values()))
+        return avg_recovery

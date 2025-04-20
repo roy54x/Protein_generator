@@ -1,5 +1,5 @@
 MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
-PRETRAINED_MODEL_PATH = r""
+PRETRAINED_MODEL_PATH = r"models\SequenceDiffusion\20250420\best_model.pth"
 
 NUM_SAMPLES_IN_DATAFRAME = 100000
 
@@ -11,8 +11,8 @@ INDEX_TO_AMINO_ACID = {i: aa for i, aa in enumerate(AMINO_ACIDS)}
 PAD_IDX = AMINO_ACID_TO_INDEX['<pad>']
 
 MIN_SIZE = 3
-MAX_TRAINING_SIZE = 250
-MAX_SIZE = 250
-BATCH_SIZE = 8
+MAX_TRAINING_SIZE = 128
+MAX_SIZE = 128
+BATCH_SIZE = 32
 
 DECAY_RATE = 0.25

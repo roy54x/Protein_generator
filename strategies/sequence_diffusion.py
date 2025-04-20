@@ -40,7 +40,7 @@ class SequenceDiffusion(Base):
 
             # Sample replacements
             replacements = torch.multinomial(prob_tensor, num_samples=1).squeeze(-1)
-            s = "".join([self.aa_list[idx] for idx in replacements])
+            s = [self.aa_list[idx] for idx in replacements]
 
             # Randomly remove one AA from end
             if len(s) > 0 and random.random() < reduce_odds:
@@ -48,9 +48,9 @@ class SequenceDiffusion(Base):
 
             # Randomly add one AA to end
             if random.random() < addition_odds:
-                s = s + random.choice(self.aa_list)
+                s.append(random.choice(self.aa_list))
 
-        return s
+        return "".join(s)
 
     def load_inputs_and_ground_truth(self, batch_data, t=1):
         sequences = []

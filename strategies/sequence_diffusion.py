@@ -89,35 +89,4 @@ class SequenceDiffusion(Base):
         return self.loss_fn(outputs.view(-1, self.vocab_size), ground_truth.view(-1))
 
     def evaluate(self, batch_data):
-        recovery_stats = {t: {'correct': 0, 'total': 0} for t in range(1, self.noise_levels + 1)}
-
-        self.eval()  # Ensure model is in eval mode
-
-        for t in range(1, self.noise_levels + 1):
-            inputs, sequences = self.load_inputs_and_ground_truth(batch_data, t=t)
-            noised_sequences, timesteps = inputs
-
-            outputs = self.forward((noised_sequences, timesteps))
-            predictions = outputs.argmax(dim=-1)
-
-            mask = sequences != PAD_IDX
-            correct = (predictions == sequences) & mask
-            total_correct = correct.sum().item()
-            total_tokens = mask.sum().item()
-
-            recovery_stats[t]['correct'] += total_correct
-            recovery_stats[t]['total'] += total_tokens
-
-        recovery_rates = {
-            t: (recovery_stats[t]['correct'] / recovery_stats[t]['total']) if recovery_stats[t]['total'] > 0 else 0.0
-            for t in recovery_stats
-        }
-
-        # Print recovery rates per noise level
-        print("Recovery Rates by Noise Level:")
-        for t in sorted(recovery_rates):
-            print(f"  Noise level {t}: {recovery_rates[t]:.4f}")
-
-        # Return the average across all noise levels
-        avg_recovery = np.mean(list(recovery_rates.values()))
-        return avg_recovery
+        pass

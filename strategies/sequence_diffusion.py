@@ -52,7 +52,7 @@ class SequenceDiffusion(Base):
 
         return s
 
-    def load_inputs_and_ground_truth(self, batch_data, t=None):
+    def load_inputs_and_ground_truth(self, batch_data, t=1):
         sequences = []
         noised_sequences = []
         timesteps = []
@@ -89,4 +89,22 @@ class SequenceDiffusion(Base):
         return self.loss_fn(outputs.view(-1, self.vocab_size), ground_truth.view(-1))
 
     def evaluate(self, batch_data):
-        pass
+        """
+        Evaluates the model's recovery performance on a batch.
+        """
+        self.eval()
+        with torch.no_grad():
+            inputs, ground_truth = batch_data
+            self.to(self.device)
+            outputs = self(inputs)  # logits: (batch_size, seq_len, vocab_size)
+            predicted_indices = torch.argmax(outputs, dim=-1)  # (batch_size, seq_len)
+
+            # Mask padding tokens (assuming 0 is the padding token)
+            padding_mask = ground_truth != 1
+            correct = (predicted_indices == ground_truth) & padding_mask
+
+            per_sequence_recovery = correct.sum(dim=1).float() / padding_mask.sum(dim=1).float()
+            recovery_rate = per_sequence_recovery.mean()
+
+            print(f"Recovery rate: {recovery_rate.item():.4f}")
+            return recovery_rate.item()

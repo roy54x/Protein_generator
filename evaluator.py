@@ -1,26 +1,18 @@
-import json
-import os.path
-
 import numpy as np
-import pandas as pd
-import torch
-from numpy import average
-from scipy.stats import pearsonr
 
 import os
+
+import numpy as np
 import torch
-import pandas as pd
-from scipy.stats import pearsonr
 
 from constants import MAIN_DIR, PRETRAINED_MODEL_PATH, BATCH_SIZE
 from strategies.coords_to_latent_space import CoordsToLatentSpace
-from strategies.coords_to_sequence import CoordsToSequence
+from strategies.sequence_diffusion import SequenceDiffusion
 from trainer import get_dataloader
 
-
 if __name__ == '__main__':
-    directory = os.path.join(MAIN_DIR, "cath_data/test_set")
-    strategy = CoordsToLatentSpace()
+    directory = os.path.join(MAIN_DIR, "absd_data\data")
+    strategy = SequenceDiffusion()
     model_path = os.path.join(MAIN_DIR, PRETRAINED_MODEL_PATH)
 
     strategy.load_state_dict(torch.load(model_path))

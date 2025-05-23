@@ -14,6 +14,7 @@ from constants import MIN_SIZE, MAIN_DIR, AMINO_ACIDS, MAX_SIZE, NUM_SAMPLES_IN_
 from strategies.contact_map_to_sequence import ContactMapToSequence
 from strategies.coords_to_latent_space import CoordsToLatentSpace
 from strategies.coords_to_sequence import CoordsToSequence
+from strategies.sequence_diffusion import SequenceDiffusion
 from strategies.sequence_to_distogram import SequenceToDistogram
 
 
@@ -48,7 +49,7 @@ class Trainer:
         self.directory = directory
         self.strategy = strategy.to(device)
         self.pretrained_model_path = pretrained_model_path
-        if os.path.exists(self.pretrained_model_path):
+        if os.path.exists(self.pretrained_model_path) and self.pretrained_model_path.endswith(".pth"):
             model = torch.load(pretrained_model_path)
             self.strategy.load_state_dict(model)
         else:
@@ -83,9 +84,17 @@ class Trainer:
                 train_loader = get_dataloader(train_file, self.strategy, self.batch_size, mode="train")
 
                 for inputs, ground_truth in train_loader:
+                    if isinstance(inputs, tuple):
+                        inputs = tuple(x.to(self.device) for x in inputs)
+                    else:
+                        inputs = inputs.to(self.device)
+                    if isinstance(ground_truth, tuple):
+                        ground_truth = tuple(x.to(self.device) for x in ground_truth)
+                    else:
+                        ground_truth = ground_truth.to(self.device)
+
                     self.optimizer.zero_grad()
-                    outputs = self.strategy((x.to(self.device) for x in inputs))
-                    ground_truth = (x.to(self.device) for x in ground_truth)
+                    outputs = self.strategy(inputs)
                     loss = self.strategy.compute_loss(outputs, ground_truth)
                     loss.backward()
                     self.optimizer.step()
@@ -115,8 +124,17 @@ class Trainer:
                     val_loader = get_dataloader(val_file, self.strategy, self.batch_size, mode="val")
 
                     for inputs, ground_truth in val_loader:
-                        outputs = self.strategy((x.to(self.device) for x in inputs))
-                        ground_truth = (x.to(self.device) for x in ground_truth)
+                        if isinstance(inputs, tuple):
+                            inputs = tuple(x.to(self.device) for x in inputs)
+                        else:
+                            inputs = inputs.to(self.device)
+                        if isinstance(ground_truth, tuple):
+                            ground_truth = tuple(x.to(self.device) for x in ground_truth)
+                        else:
+                            ground_truth = ground_truth.to(self.device)
+
+                        self.optimizer.zero_grad()
+                        outputs = self.strategy(inputs)
                         loss = self.strategy.compute_loss(outputs, ground_truth)
                         total_val_loss += loss.item()
                         total_val_samples += 1
@@ -145,9 +163,9 @@ class Trainer:
 
 
 if __name__ == '__main__':
-    data_path = os.path.join(MAIN_DIR, "cath_data/train_set")
+    data_path = os.path.join(MAIN_DIR, "absd_data/data")
     pretrained_model_path = os.path.join(MAIN_DIR, PRETRAINED_MODEL_PATH)
-    strategy = CoordsToLatentSpace()
+    strategy = SequenceDiffusion()
     trainer = Trainer(data_path, strategy, batch_size=BATCH_SIZE, val_size=0.15,
                       pretrained_model_path=pretrained_model_path)
     trainer.train(epochs=10000)

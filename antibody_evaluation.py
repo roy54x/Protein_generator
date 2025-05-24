@@ -1,7 +1,7 @@
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import os
 from pathlib import Path
-from colabfold.batch import run as colabfold_run
+from colabfold.batch import run as colabfold_run, get_queries
 import py3Dmol
 
 from antibody_generators import generate_single_sequence
@@ -24,8 +24,9 @@ def fold_and_plot_with_alphafold(sequence, tag="antibody", output_dir="folded_st
     with open(fasta_path, "w") as f:
         f.write(f">seq\n{sequence}")
 
-    colabfold_run(fasta_path, output_dir, use_templates=False,
-                  num_models=1, is_complex=False, num_recycles=3)
+    queries, is_complex = get_queries(fasta_path)
+    colabfold_run(queries, output_dir, use_templates=False,
+                  num_models=1, is_complex=is_complex, num_recycles=3)
 
     pdb_path = os.path.join(output_dir, f"{tag}_model_1.pdb")
 
@@ -67,7 +68,7 @@ def compute_diversity(sequences):
 if __name__ == "__main__":
     print("Generating antibody sequences...")
     n = 5
-    seq_len = 130
+    seq_len = 120
     all_sequences = []
 
     for i in range(n):

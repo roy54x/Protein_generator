@@ -54,7 +54,7 @@ def fold_and_plot_with_alphafold(sequence, tag="", output_dir="folded_structures
 
     view = py3Dmol.view(js='https://3dmol.org/build/3Dmol.js')
     view.addModel(pdb_data, 'pdb')
-    view.setStyle({'cartoon': {'colorscheme': {'prop': 'b', 'gradient': 'roygb', 'min': 0.5, 'max': 0.9}}})
+    view.setStyle({'cartoon': {'colorscheme': {'prop': 'b', 'gradient': 'roygb', 'min': 0, 'max': 100}}})
     view.zoomTo()
 
     html_path = os.path.join(output_dir, f"{tag}_structure.html")

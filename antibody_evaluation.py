@@ -1,3 +1,6 @@
+import glob
+import shutil
+
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import os
 from pathlib import Path
@@ -18,29 +21,47 @@ def compute_aggregation_propensity(sequence):
                if all(residue in hydrophobic_residues for residue in sequence[i:i + 5]))
 
 
-def fold_and_plot_with_alphafold(sequence, tag="antibody", output_dir="folded_structures"):
+def fold_and_plot_with_alphafold(sequence, tag="", output_dir="folded_structures"):
     Path(output_dir).mkdir(exist_ok=True)
+
+    # Save sequence with custom tag in FASTA
     fasta_path = os.path.join(output_dir, f"{tag}.fasta")
     with open(fasta_path, "w") as f:
-        f.write(f">seq\n{sequence}")
+        f.write(f">{tag}\n{sequence}")  # 🟢 Use tag as FASTA name
 
+    # Run ColabFold
     queries, is_complex = get_queries(fasta_path)
-    colabfold_run(queries, output_dir, use_templates=False,
-                  num_models=1, is_complex=is_complex, num_recycles=3)
+    colabfold_run(
+        queries, output_dir,
+        use_templates=False,
+        num_models=1,
+        is_complex=is_complex,
+        num_recycles=3
+    )
 
-    pdb_path = os.path.join(output_dir, f"{tag}_model_1.pdb")
+    pdb_candidates = glob.glob(os.path.join(output_dir, f"*{tag}*model_1*.pdb"))
+    if not pdb_candidates:
+        pdb_candidates = glob.glob(os.path.join(output_dir, "*model_1*.pdb"))
+        if not pdb_candidates:
+            raise FileNotFoundError(f"No model_1 PDB file found for tag '{tag}' in {output_dir}")
 
-    # Visualize using py3Dmol
-    with open(pdb_path, 'r') as f:
+    original_pdb_path = pdb_candidates[0]
+    tagged_pdb_path = os.path.join(output_dir, f"{tag}_model_1.pdb")
+    shutil.copy(original_pdb_path, tagged_pdb_path)
+
+    with open(tagged_pdb_path, 'r') as f:
         pdb_data = f.read()
 
     view = py3Dmol.view(js='https://3dmol.org/build/3Dmol.js')
     view.addModel(pdb_data, 'pdb')
     view.setStyle({'cartoon': {'colorscheme': {'prop': 'b', 'gradient': 'roygb', 'min': 0.5, 'max': 0.9}}})
     view.zoomTo()
-    view.show()
 
-    # Extract average pLDDT score from B-factor column
+    html_path = os.path.join(output_dir, f"{tag}_structure.html")
+    with open(html_path, "w") as f:
+        f.write(view._make_html())
+    print(f"3D structure view saved to: {html_path}")
+
     plDDTs = []
     for line in pdb_data.splitlines():
         if line.startswith("ATOM"):
@@ -50,7 +71,6 @@ def fold_and_plot_with_alphafold(sequence, tag="antibody", output_dir="folded_st
             except ValueError:
                 continue
     return sum(plDDTs) / len(plDDTs) if plDDTs else None
-
 
 def compute_diversity(sequences):
     def hamming(s1, s2):

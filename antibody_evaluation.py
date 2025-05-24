@@ -100,6 +100,6 @@ if __name__ == "__main__":
         print("Aggregation Propensity (Hydrophobic Clusters - The lower the better):",
               compute_aggregation_propensity(seq))
         avg_plddt = fold_and_plot_with_alphafold(seq, tag=f"antibody_{i}")
-        print("Average pLDDT score:", avg_plddt)
+        print("Average pLDDT score - Above 70 is considered good:", avg_plddt)
 
-    print("\nDiversity across sequences:", compute_diversity(all_sequences))
+    print(f"\nDiversity across sequences - above {str(0.3*seq_len)} is considered diverse:", compute_diversity(all_sequences))

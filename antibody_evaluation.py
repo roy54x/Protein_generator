@@ -74,7 +74,11 @@ def fold_and_plot_with_alphafold(sequence, tag="", output_dir="folded_structures
 
 def compute_diversity(sequences):
     def hamming(s1, s2):
-        return sum(c1 != c2 for c1, c2 in zip(s1, s2))
+        min_len = min(len(s1), len(s2))
+        if min_len == 0:
+            return 0.0
+        dist = sum(c1 != c2 for c1, c2 in zip(s1[:min_len], s2[:min_len]))
+        return dist / min_len  # Normalize by compared length
 
     if len(sequences) < 2:
         return 0.0
@@ -83,7 +87,7 @@ def compute_diversity(sequences):
         for j in range(i + 1, len(sequences)):
             total_dist += hamming(sequences[i], sequences[j])
             count += 1
-    return total_dist / count
+    return total_dist / count if count > 0 else 0.0
 
 if __name__ == "__main__":
     print("Generating antibody sequences...")
@@ -103,4 +107,4 @@ if __name__ == "__main__":
         #avg_plddt = fold_and_plot_with_alphafold(seq, tag=f"antibody_{i}")
         #print("Average pLDDT score - Above 70 is considered good:", avg_plddt)
 
-    print(f"\nDiversity across sequences - above {str(0.3*seq_len)} is considered diverse:", compute_diversity(all_sequences))
+    print(f"\nDiversity across sequences - above {str(0.3*(min_len+max_len)/2)} is considered diverse:", compute_diversity(all_sequences))

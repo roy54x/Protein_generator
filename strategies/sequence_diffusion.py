@@ -6,7 +6,7 @@ import torch.nn as nn
 from evodiff.pretrained import OA_DM_38M
 from evodiff.generate import generate_oaardm
 
-from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX, PAD_IDX
+from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX
 from strategies.base import Base
 from utils.utils import get_blosum_probability_function
 
@@ -17,23 +17,24 @@ class SequenceDiffusion(Base):
         self.get_prob_vec, self.aa_list = get_blosum_probability_function()
         self.aa_to_idx = {aa: i for i, aa in enumerate(self.aa_list)}
         self.idx_to_aa = {i: aa for aa, i in self.aa_to_idx.items()}
-        self.noise_levels = 3
+        self.noise_levels = 10
 
         # EvoDiff OA_DM_38M model and tokenizer
         checkpoint = OA_DM_38M()
         self.model, _, self.tokenizer, _ = checkpoint
+        self.pad_id = self.tokenizer.pad_id
         self.model.train()
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.model.to(self.device)
-        self.loss_fn = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=self.pad_id)
 
     def pad_sequence(self, sequence):
         # Use EvoDiff tokenizer for padding/encoding
         tokenized = list(self.tokenizer.tokenize(sequence.split()))
-        padded = tokenized[:MAX_TRAINING_SIZE] + [PAD_IDX] * (MAX_TRAINING_SIZE - len(tokenized))
+        padded = tokenized[:MAX_TRAINING_SIZE] + [self.pad_id] * (MAX_TRAINING_SIZE - len(tokenized))
         return padded
 
-    def add_noise(self, sequence, t=1, reduce_odds=0.25, addition_odds=0.75):
+    def add_noise(self, sequence, t=1, reduce_odds=0.0, addition_odds=0.0):
         """sequence: list of amino acid **letters**"""
         s = list(sequence)
 

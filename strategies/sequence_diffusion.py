@@ -29,7 +29,7 @@ class SequenceDiffusion(Base):
 
     def pad_sequence(self, sequence):
         # Use EvoDiff tokenizer for padding/encoding
-        tokenized = self.tokenizer.tokenize(sequence)
+        tokenized = list(self.tokenizer.tokenize(sequence.split()))
         padded = tokenized[:MAX_TRAINING_SIZE] + [PAD_IDX] * (MAX_TRAINING_SIZE - len(tokenized))
         return padded
 

@@ -87,19 +87,20 @@ def compute_diversity(sequences):
 
 if __name__ == "__main__":
     print("Generating antibody sequences...")
-    n = 1
-    seq_len = 120
+    n = 100
+    min_len = 80
+    max_len = 150
     all_sequences = []
 
     for i in range(n):
-        seq = generate_EvoDiff(seq_len=seq_len)
+        seq = generate_EvoDiff(min_len=min_len, max_len=max_len)
         all_sequences.append(seq)
 
         print(f"\nGenerated Sequence {i + 1}:\n{seq}")
         print("Stability (Instability Index - Lower than 40 is considered good):", compute_stability(seq))
         print("Aggregation Propensity (Hydrophobic Clusters - The lower the better):",
               compute_aggregation_propensity(seq))
-        avg_plddt = fold_and_plot_with_alphafold(seq, tag=f"antibody_{i}")
-        print("Average pLDDT score - Above 70 is considered good:", avg_plddt)
+        #avg_plddt = fold_and_plot_with_alphafold(seq, tag=f"antibody_{i}")
+        #print("Average pLDDT score - Above 70 is considered good:", avg_plddt)
 
     print(f"\nDiversity across sequences - above {str(0.3*seq_len)} is considered diverse:", compute_diversity(all_sequences))

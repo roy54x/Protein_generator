@@ -1,5 +1,5 @@
 MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
-PRETRAINED_MODEL_PATH = r"models\SequenceDiffusion\20250420\best_model.pth"
+PRETRAINED_MODEL_PATH = r""
 
 NUM_SAMPLES_IN_DATAFRAME = 100000
 

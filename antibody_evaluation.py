@@ -87,7 +87,7 @@ def compute_diversity(sequences):
         for j in range(i + 1, len(sequences)):
             total_dist += hamming(sequences[i], sequences[j])
             count += 1
-    return total_dist / count if count > 0 else 0.0
+    return 100 * total_dist / count if count > 0 else 0.0
 
 if __name__ == "__main__":
     print("Generating antibody sequences...")
@@ -107,4 +107,4 @@ if __name__ == "__main__":
         #avg_plddt = fold_and_plot_with_alphafold(seq, tag=f"antibody_{i}")
         #print("Average pLDDT score - Above 70 is considered good:", avg_plddt)
 
-    print(f"\nDiversity across sequences - above {str(0.3*(min_len+max_len)/2)} is considered diverse:", compute_diversity(all_sequences))
+    print(f"\nDiversity across sequences - above 50 is considered diverse:", compute_diversity(all_sequences))

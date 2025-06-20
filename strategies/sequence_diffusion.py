@@ -3,7 +3,8 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
-from transformers import RobertaModel, RobertaTokenizer
+from evodiff.pretrained import OA_DM_38M
+from evodiff.generate import generate_oaardm
 
 from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX, PAD_IDX
 from strategies.base import Base
@@ -18,14 +19,17 @@ class SequenceDiffusion(Base):
         self.idx_to_aa = {i: aa for aa, i in self.aa_to_idx.items()}
         self.noise_levels = 3
 
-        self.vocab_size = len(AMINO_ACID_TO_INDEX)
-        self.roberta = RobertaModel.from_pretrained("distilroberta-base")
-        self.lm_head = nn.Linear(self.roberta.config.hidden_size, self.vocab_size)
-        self.loss_fn = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
+        # EvoDiff OA_DM_38M model and tokenizer
+        checkpoint = OA_DM_38M()
+        self.model, _, self.tokenizer, _ = checkpoint
+        self.model.train()
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.model.to(self.device)
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
 
     def pad_sequence(self, sequence):
-        tokenized = [AMINO_ACID_TO_INDEX.get(aa, PAD_IDX) for aa in sequence]
+        # Use EvoDiff tokenizer for padding/encoding
+        tokenized = self.tokenizer.tokenize(sequence)
         padded = tokenized[:MAX_TRAINING_SIZE] + [PAD_IDX] * (MAX_TRAINING_SIZE - len(tokenized))
         return padded
 
@@ -72,21 +76,15 @@ class SequenceDiffusion(Base):
         noised_sequences = torch.stack(noised_sequences).to(self.device)
         timesteps = torch.tensor(timesteps, dtype=torch.long).to(self.device)
 
-        return (noised_sequences, timesteps), sequences
+        return (noised_sequences, timesteps, sequences), sequences
 
     def forward(self, inputs):
-        """
-        Forward pass to reconstruct the original sequence from the noised input.
-        """
-        (noised_sequences, timesteps) = inputs
-        embeddings = self.roberta.embeddings(input_ids=noised_sequences)
-        outputs = self.roberta.encoder(embeddings)
-        hidden_states = outputs[0]  # (batch_size, seq_len, hidden_size)
-        logits = self.lm_head(hidden_states)
+        noised_sequences, timesteps, ground_truth = inputs
+        logits = self.model(noised_sequences, ground_truth)
         return logits
 
     def compute_loss(self, outputs, ground_truth):
-        return self.loss_fn(outputs.view(-1, self.vocab_size), ground_truth.view(-1))
+        return self.loss_fn(outputs.reshape(-1, outputs.size(-1)), ground_truth.reshape(-1))
 
     def evaluate(self, batch_data):
         """

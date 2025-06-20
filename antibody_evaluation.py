@@ -7,7 +7,7 @@ from pathlib import Path
 from colabfold.batch import run as colabfold_run, get_queries
 import py3Dmol
 
-from antibody_generators import generate_single_sequence
+from antibody_generators import generate_EvoDiff
 
 
 def compute_stability(sequence):
@@ -87,12 +87,12 @@ def compute_diversity(sequences):
 
 if __name__ == "__main__":
     print("Generating antibody sequences...")
-    n = 5
+    n = 1
     seq_len = 120
     all_sequences = []
 
     for i in range(n):
-        seq = generate_single_sequence(seq_len=seq_len)
+        seq = generate_EvoDiff(seq_len=seq_len)
         all_sequences.append(seq)
 
         print(f"\nGenerated Sequence {i + 1}:\n{seq}")

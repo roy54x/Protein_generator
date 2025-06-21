@@ -17,67 +17,55 @@ class SequenceDiffusion(Base):
         self.get_prob_vec, self.aa_list = get_blosum_probability_function()
         self.aa_to_idx = {aa: i for i, aa in enumerate(self.aa_list)}
         self.idx_to_aa = {i: aa for aa, i in self.aa_to_idx.items()}
-        self.noise_levels = 10
 
         # EvoDiff OA_DM_38M model and tokenizer
         checkpoint = OA_DM_38M()
         self.model, _, self.tokenizer, _ = checkpoint
         self.pad_id = self.tokenizer.pad_id
+        self.mask_id = self.tokenizer.mask_id
         self.model.train()
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.model.to(self.device)
         self.loss_fn = nn.CrossEntropyLoss(ignore_index=self.pad_id)
 
-    def pad_sequence(self, sequence):
-        # Use EvoDiff tokenizer for padding/encoding
-        tokenized = list(self.tokenizer.tokenize(sequence.split()))
+    def tokenize_and_padd(self, sequence):
+        tokenized = list(self.tokenizer.tokenize([sequence]))
         padded = tokenized[:MAX_TRAINING_SIZE] + [self.pad_id] * (MAX_TRAINING_SIZE - len(tokenized))
         return padded
 
-    def add_noise(self, sequence, t=1, reduce_odds=0.0, addition_odds=0.0):
-        """sequence: list of amino acid **letters**"""
-        s = list(sequence)
+    def add_noise(self, input_tensor):
+        L = input_tensor.size(0)
+        t = random.randint(0, L)
 
-        for _ in range(t):
-            # For all valid amino acids, get their prob vectors
-            prob_vectors = [self.get_prob_vec(aa) for aa in s]
-            prob_tensor = torch.tensor(np.stack(prob_vectors))  # (n_valid, vocab_size)
+        order = list(range(L))
+        random.shuffle(order)
 
-            # Sample replacements
-            replacements = torch.multinomial(prob_tensor, num_samples=1).squeeze(-1)
-            s = [self.aa_list[idx] for idx in replacements]
+        masked_indices = set(order[:t])
+        noised = [
+            self.mask_id if i in masked_indices else input_tensor[i].item()
+            for i in range(L)
+        ]
 
-            # Randomly remove one AA from end
-            if len(s) > 0 and random.random() < reduce_odds:
-                s = s[:-1]
-
-            # Randomly add one AA to end
-            if random.random() < addition_odds:
-                s.append(random.choice(self.aa_list))
-
-        return "".join(s)
+        return torch.tensor(noised, dtype=torch.long), t
 
     def load_inputs_and_ground_truth(self, batch_data, t=1):
-        sequences = []
-        noised_sequences = []
+        gt_tensors = []
+        noised_tensors = []
         timesteps = []
 
         for data in batch_data:
-            timestep = (
-                random.randint(1, self.noise_levels)
-                if self.training or t is None else t
-            )
-            noised_seq = self.add_noise(data['sequence'], t=timestep)
+            padded_tensor = torch.tensor(self.tokenize_and_padd(data['sequence']), dtype=torch.long)
+            noised_tensor, timestep = self.add_noise(padded_tensor)
 
-            sequences.append(torch.tensor(self.pad_sequence(data['sequence']), dtype=torch.long))
-            noised_sequences.append(torch.tensor(self.pad_sequence(noised_seq), dtype=torch.long))
+            gt_tensors.append(padded_tensor)
+            noised_tensors.append(noised_tensor)
             timesteps.append(timestep)
 
-        sequences = torch.stack(sequences).to(self.device)
-        noised_sequences = torch.stack(noised_sequences).to(self.device)
+        gt_tensors = torch.stack(gt_tensors).to(self.device)
+        noised_tensors = torch.stack(noised_tensors).to(self.device)
         timesteps = torch.tensor(timesteps, dtype=torch.long).to(self.device)
 
-        return (noised_sequences, timesteps, sequences), sequences
+        return (noised_tensors, timesteps, gt_tensors), gt_tensors
 
     def forward(self, inputs):
         noised_sequences, timesteps, ground_truth = inputs

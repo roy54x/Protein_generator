@@ -22,5 +22,6 @@ def generate_EvoDiff(min_len, max_len, finetuned=True, batch_size=1, device="cpu
         checkpoint = OA_DM_38M()
         model, _, tokenizer, _ = checkpoint
 
-    _, generated_sequence = generate_oaardm(model, tokenizer, seq_len, batch_size=batch_size, device=device)
+    _, generated_sequence = generate_oaardm(model, tokenizer, seq_len,
+                                            batch_size=batch_size, device=device, penalty=1.25)
     return generated_sequence[0]

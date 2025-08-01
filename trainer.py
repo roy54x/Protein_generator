@@ -59,7 +59,7 @@ class Trainer:
         self.batch_size = batch_size
         self.val_size = val_size
         self.device = device
-        self.optimizer = optim.Adam(strategy.parameters(), lr=1e-3, weight_decay=1e-4)
+        self.optimizer = optim.Adam(strategy.parameters(), lr=1e-5, weight_decay=1e-4)
         self.best_val_loss = float('inf')
 
         # Collect all file paths from the directory

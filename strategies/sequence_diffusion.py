@@ -11,6 +11,39 @@ from strategies.base import Base
 from utils.utils import get_blosum_probability_function
 
 
+class DiffusionTransformer(nn.Module):
+    def __init__(self, vocab_size, d_model=256, nhead=8, num_layers=6, dim_feedforward=512, dropout=0.1, max_len=512):
+        super().__init__()
+        self.token_embedding = nn.Embedding(vocab_size, d_model)
+        self.timestep_embedding = nn.Embedding(max_len, d_model)  # Large enough for all t
+        self.position_embedding = nn.Embedding(max_len, d_model)
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout, batch_first=True
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.layer_norm = nn.LayerNorm(d_model)
+        self.output_layer = nn.Linear(d_model, vocab_size)
+
+    def forward(self, x, t):
+        """
+        x: (batch_size, seq_len) -> input tokens (can include masked tokens)
+        t: (batch_size,) -> timestep conditioning
+        """
+        batch_size, seq_len = x.size()
+
+        tok_emb = self.token_embedding(x)                     # (batch, seq, d_model)
+        pos_emb = self.position_embedding(
+            torch.arange(seq_len, device=x.device).unsqueeze(0).expand(batch_size, -1)
+        )
+        time_emb = self.timestep_embedding(t).unsqueeze(1).expand(-1, seq_len, -1)
+
+        x = tok_emb + pos_emb + time_emb
+        x = self.encoder(x)
+        x = self.layer_norm(x)
+        return self.output_layer(x)
+
+
 class SequenceDiffusion(Base):
     def __init__(self):
         super().__init__()
@@ -18,9 +51,11 @@ class SequenceDiffusion(Base):
         self.aa_to_idx = {aa: i for i, aa in enumerate(self.aa_list)}
         self.idx_to_aa = {i: aa for aa, i in self.aa_to_idx.items()}
 
-        # EvoDiff OA_DM_38M model and tokenizer
-        checkpoint = OA_DM_38M()
-        self.model, _, self.tokenizer, _ = checkpoint
+        #checkpoint = OA_DM_38M()
+        #self.model, _, self.tokenizer, _ = checkpoint
+        self.tokenizer = OA_DM_38M()[2]
+        vocab_size = len(self.tokenizer.alphabet)
+        self.model = DiffusionTransformer(vocab_size=vocab_size)
         self.pad_id = self.tokenizer.pad_id
         self.mask_id = self.tokenizer.mask_id
         self.model.train()
@@ -65,11 +100,11 @@ class SequenceDiffusion(Base):
         noised_tensors = torch.stack(noised_tensors).to(self.device)
         timesteps = torch.tensor(timesteps, dtype=torch.long).to(self.device)
 
-        return (noised_tensors, timesteps, gt_tensors), gt_tensors
+        return (noised_tensors, timesteps), gt_tensors
 
     def forward(self, inputs):
-        noised_sequences, timesteps, ground_truth = inputs
-        logits = self.model(noised_sequences, ground_truth)
+        noised_sequences, timesteps = inputs
+        logits = self.model(noised_sequences, timesteps)
         return logits
 
     def compute_loss(self, outputs, ground_truth):

@@ -1,5 +1,5 @@
 MAIN_DIR = r"C:\Users\RoyIlani\Desktop\personal\proteins"
-PRETRAINED_MODEL_PATH = r"models\SequenceDiffusion\20250621\best_model.pth"
+PRETRAINED_MODEL_PATH = r"models\SequenceDiffusion\20250731\best_model.pth"
 
 NUM_SAMPLES_IN_DATAFRAME = 100000
 
@@ -13,6 +13,6 @@ PAD_IDX = AMINO_ACID_TO_INDEX['<pad>']
 MIN_SIZE = 3
 MAX_TRAINING_SIZE = 128
 MAX_SIZE = 128
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 
 DECAY_RATE = 0.25

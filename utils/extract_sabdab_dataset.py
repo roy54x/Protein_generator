@@ -1,6 +1,8 @@
 import os
+
+import numpy as np
 import pandas as pd
-from Bio.PDB import PDBParser, PPBuilder
+from Bio.PDB import PDBParser, PPBuilder, NeighborSearch
 from tqdm import tqdm
 
 # --- Config ---
@@ -13,17 +15,19 @@ parser = PDBParser(QUIET=True)
 ppb = PPBuilder()
 
 df = pd.read_csv(SUMMARY_TSV, sep="\t")
+df.columns = df.columns.str.strip()
 df["pdb"] = df["pdb"].str.lower()
 
-def get_ca_coords(structure, chain_ids):
-    coords = []
+# --- Helper: extract Cα coordinates ---
+def get_ca_coords_per_chain(structure, chain_ids):
+    chain_coords = {}
     for chain in structure[0]:
         if chain.id in chain_ids:
-            for res in chain:
-                if "CA" in res:
-                    coords.append(res["CA"].get_coord().tolist())
-    return coords
+            coords = [res["CA"].get_coord().tolist() for res in chain if "CA" in res]
+            chain_coords[chain.id] = coords
+    return chain_coords
 
+# --- Helper: extract sequence ---
 def get_sequence(chain):
     try:
         peptides = ppb.build_peptides(chain)
@@ -31,6 +35,31 @@ def get_sequence(chain):
     except Exception:
         return ""
 
+# --- Helper: find antibody-antigen contacts ---
+def find_contacts_from_coords(antibody_coords_dict, antigen_coords_dict, cutoff=5.0):
+    contacts = []
+
+    for ab_chain, ab_coords in antibody_coords_dict.items():
+        ab_coords = np.array(ab_coords)
+        for ag_chain, ag_coords in antigen_coords_dict.items():
+            ag_coords = np.array(ag_coords)
+
+            # Compute pairwise distances: (n_ab, n_ag)
+            dists = np.linalg.norm(ab_coords[:, None, :] - ag_coords[None, :, :], axis=-1)
+
+            # Find index pairs where dist <= cutoff
+            ab_idx, ag_idx = np.where(dists <= cutoff)
+            for i, j in zip(ab_idx, ag_idx):
+                contacts.append({
+                    "antibody_chain": ab_chain,
+                    "antibody_residue_index": i,
+                    "antigen_chain": ag_chain,
+                    "antigen_residue_index": j
+                })
+
+    return contacts
+
+# --- Main loop ---
 records = []
 
 for _, row in tqdm(df.iterrows(), total=len(df)):
@@ -51,28 +80,35 @@ for _, row in tqdm(df.iterrows(), total=len(df)):
         if pd.notna(row["antigen_chain"]) and row["antigen_chain"] != "NA":
             antigen_chains = [c.strip() for c in row["antigen_chain"].replace("|", ",").split(",")]
 
-        if not h_chain or not l_chain or h_chain not in model or l_chain not in model:
+        if not h_chain or not l_chain or h_chain not in model or l_chain not in model or len(antigen_chains) == 0:
             continue  # skip incomplete antibodies
 
         # Sequences
-        heavy_seq = get_sequence(model[h_chain])
-        light_seq = get_sequence(model[l_chain])
-        antigen_seqs = {}
-        for chain_id in antigen_chains:
-            if chain_id in model:
-                antigen_seqs[chain_id] = get_sequence(model[chain_id])
+        antibody_seqs = {}
+        for chain_id in [h_chain, l_chain]:
+            if chain_id and chain_id in model:
+                antibody_seqs[chain_id] = get_sequence(model[chain_id])
+
+        antigen_seqs = {
+            chain_id: get_sequence(model[chain_id])
+            for chain_id in antigen_chains
+            if chain_id in model
+        }
 
         # Coordinates
-        antibody_coords = get_ca_coords(structure, [h_chain, l_chain])
-        antigen_coords = get_ca_coords(structure, antigen_chains)
+        antibody_coords = get_ca_coords_per_chain(structure, [h_chain, l_chain])
+        antigen_coords = get_ca_coords_per_chain(structure, antigen_chains)
+
+        # Contacts
+        binding_contacts = find_contacts_from_coords(antibody_coords, antigen_coords)
 
         record = row.to_dict()
         record.update({
-            "heavy_sequence": heavy_seq,
-            "light_sequence": light_seq,
+            "antibody_sequences": antibody_seqs,
             "antigen_sequences": antigen_seqs,
             "antibody_coords": antibody_coords,
             "antigen_coords": antigen_coords,
+            "binding_contacts": binding_contacts
         })
         records.append(record)
 
@@ -83,4 +119,4 @@ for _, row in tqdm(df.iterrows(), total=len(df)):
 # --- Save ---
 final_df = pd.DataFrame(records)
 final_df.to_json(OUT_JSON, orient="records", lines=True)
-print(f"✅ Saved {len(final_df)} complete entries to {OUT_JSON}")
+print(f"✅ Saved {len(final_df)} complete entries with contacts to {OUT_JSON}")

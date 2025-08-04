@@ -18,6 +18,7 @@ df = pd.read_csv(SUMMARY_TSV, sep="\t")
 df.columns = df.columns.str.strip()
 df["pdb"] = df["pdb"].str.lower()
 
+
 # --- Helper: extract Cα coordinates ---
 def get_ca_coords_per_chain(structure, chain_ids):
     chain_coords = {}
@@ -27,6 +28,7 @@ def get_ca_coords_per_chain(structure, chain_ids):
             chain_coords[chain.id] = coords
     return chain_coords
 
+
 # --- Helper: extract sequence ---
 def get_sequence(chain):
     try:
@@ -35,19 +37,23 @@ def get_sequence(chain):
     except Exception:
         return ""
 
+
 # --- Helper: find antibody-antigen contacts ---
 def find_contacts_from_coords(antibody_coords_dict, antigen_coords_dict, cutoff=5.0):
     contacts = []
 
     for ab_chain, ab_coords in antibody_coords_dict.items():
         ab_coords = np.array(ab_coords)
+        if ab_coords.ndim != 2 or ab_coords.shape[1] != 3:
+            continue  # skip malformed antibody chain
+
         for ag_chain, ag_coords in antigen_coords_dict.items():
             ag_coords = np.array(ag_coords)
+            if ag_coords.ndim != 2 or ag_coords.shape[1] != 3:
+                continue  # skip malformed antigen chain
 
-            # Compute pairwise distances: (n_ab, n_ag)
             dists = np.linalg.norm(ab_coords[:, None, :] - ag_coords[None, :, :], axis=-1)
 
-            # Find index pairs where dist <= cutoff
             ab_idx, ag_idx = np.where(dists <= cutoff)
             for i, j in zip(ab_idx, ag_idx):
                 contacts.append({
@@ -58,6 +64,7 @@ def find_contacts_from_coords(antibody_coords_dict, antigen_coords_dict, cutoff=
                 })
 
     return contacts
+
 
 # --- Main loop ---
 records = []

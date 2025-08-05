@@ -171,11 +171,13 @@ def plot_complex(row, radius=0.5, contact_color="gray"):
         except (IndexError, KeyError):
             continue
 
-        view.addLine({
+        view.addCylinder({
             "start": {"x": ab_coord[0], "y": ab_coord[1], "z": ab_coord[2]},
             "end": {"x": ag_coord[0], "y": ag_coord[1], "z": ag_coord[2]},
-            "color": contact_color,
-            "linewidth": 4  # Stronger emphasis
+            "radius": 0.5,  # You can increase this further
+            "fromCap": 1,
+            "toCap": 1,
+            "color": contact_color
         })
 
     # --- Legend (approximate positioning based on first points) ---

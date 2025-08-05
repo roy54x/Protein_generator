@@ -3,11 +3,11 @@ import os
 import numpy as np
 
 import pandas as pd
+import py3Dmol
 from matplotlib import pyplot as plt
 from sklearn.manifold import MDS
 
 from constants import MAIN_DIR, MAX_SIZE
-from utils.utils import normalize
 
 
 def get_distogram(ca_coords):
@@ -110,6 +110,52 @@ def plot_protein_atoms(predicted_points, ground_truth_points, title="Protein 3D 
     ax.grid(False)
 
     plt.show()
+
+
+def plot_complex(row, radius=0.5, contact_color="gray"):
+    view = py3Dmol.view(width=800, height=600)
+
+    # Add antibody chains
+    for chain_id, coords in row['antibody_coords'].items():
+        for xyz in coords:
+            view.addSphere({
+                "center": {"x": xyz[0], "y": xyz[1], "z": xyz[2]},
+                "radius": radius,
+                "color": "skyblue",
+                "opacity": 1.0
+            })
+
+    # Add antigen chains
+    for chain_id, coords in row['antigen_coords'].items():
+        for xyz in coords:
+            view.addSphere({
+                "center": {"x": xyz[0], "y": xyz[1], "z": xyz[2]},
+                "radius": radius,
+                "color": "salmon",
+                "opacity": 1.0
+            })
+
+    # Add binding contacts
+    for contact in row["binding_contacts"]:
+        ab_chain = contact["antibody_chain"]
+        ag_chain = contact["antigen_chain"]
+        ab_idx = contact["antibody_residue_index"]
+        ag_idx = contact["antigen_residue_index"]
+
+        try:
+            ab_coord = row["antibody_coords"][ab_chain][ab_idx]
+            ag_coord = row["antigen_coords"][ag_chain][ag_idx]
+        except (IndexError, KeyError):
+            continue
+
+        view.addLine({
+            "start": {"x": ab_coord[0], "y": ab_coord[1], "z": ab_coord[2]},
+            "end": {"x": ag_coord[0], "y": ag_coord[1], "z": ag_coord[2]},
+            "color": contact_color,
+            "linewidth": 2
+        })
+
+    return view
 
 
 if __name__ == '__main__':

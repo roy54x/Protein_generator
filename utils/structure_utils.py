@@ -3,11 +3,11 @@ import os
 import numpy as np
 
 import pandas as pd
+import py3Dmol
 from matplotlib import pyplot as plt
 from sklearn.manifold import MDS
 
 from constants import MAIN_DIR, MAX_SIZE
-from utils.utils import normalize
 
 
 def get_distogram(ca_coords):
@@ -110,6 +110,102 @@ def plot_protein_atoms(predicted_points, ground_truth_points, title="Protein 3D 
     ax.grid(False)
 
     plt.show()
+
+
+def plot_complex(row, radius=0.5, contact_color="gray"):
+    view = py3Dmol.view(width=800, height=600)
+
+    antibody_color = "skyblue"
+    antigen_color = "salmon"
+
+    # --- Add antibody chains ---
+    for chain_id, coords in row['antibody_coords'].items():
+        # Draw spheres
+        for xyz in coords:
+            view.addSphere({
+                "center": {"x": xyz[0], "y": xyz[1], "z": xyz[2]},
+                "radius": radius,
+                "color": antibody_color,
+                "opacity": 1.0
+            })
+
+        # Connect residues with lines
+        for i in range(len(coords) - 1):
+            view.addLine({
+                "start": {"x": coords[i][0], "y": coords[i][1], "z": coords[i][2]},
+                "end": {"x": coords[i+1][0], "y": coords[i+1][1], "z": coords[i+1][2]},
+                "color": antibody_color,
+                "linewidth": 1
+            })
+
+    # --- Add antigen chains ---
+    for chain_id, coords in row['antigen_coords'].items():
+        # Draw spheres
+        for xyz in coords:
+            view.addSphere({
+                "center": {"x": xyz[0], "y": xyz[1], "z": xyz[2]},
+                "radius": radius,
+                "color": antigen_color,
+                "opacity": 1.0
+            })
+
+        # Connect residues with lines
+        for i in range(len(coords) - 1):
+            view.addLine({
+                "start": {"x": coords[i][0], "y": coords[i][1], "z": coords[i][2]},
+                "end": {"x": coords[i+1][0], "y": coords[i+1][1], "z": coords[i+1][2]},
+                "color": antigen_color,
+                "linewidth": 1
+            })
+
+    # --- Draw binding contacts with strong lines ---
+    for contact in row["binding_contacts"]:
+        ab_chain = contact["antibody_chain"]
+        ag_chain = contact["antigen_chain"]
+        ab_idx = contact["antibody_residue_index"]
+        ag_idx = contact["antigen_residue_index"]
+
+        try:
+            ab_coord = row["antibody_coords"][ab_chain][ab_idx]
+            ag_coord = row["antigen_coords"][ag_chain][ag_idx]
+        except (IndexError, KeyError):
+            continue
+
+        view.addCylinder({
+            "start": {"x": ab_coord[0], "y": ab_coord[1], "z": ab_coord[2]},
+            "end": {"x": ag_coord[0], "y": ag_coord[1], "z": ag_coord[2]},
+            "radius": 0.5,  # You can increase this further
+            "fromCap": 1,
+            "toCap": 1,
+            "color": contact_color
+        })
+
+    # --- Legend (approximate positioning based on first points) ---
+    # Find a reference point for placing labels
+    try:
+        ab_xyz = next(iter(row['antibody_coords'].values()))[0]
+        ag_xyz = next(iter(row['antigen_coords'].values()))[0]
+
+        # Antibody label
+        view.addLabel("Antibody", {
+            "position": {"x": ab_xyz[0], "y": ab_xyz[1], "z": ab_xyz[2]},
+            "backgroundColor": antibody_color,
+            "fontColor": "black",
+            "fontSize": 14
+        })
+
+        # Antigen label
+        view.addLabel("Antigen", {
+            "position": {"x": ag_xyz[0], "y": ag_xyz[1], "z": ag_xyz[2]},
+            "backgroundColor": antigen_color,
+            "fontColor": "black",
+            "fontSize": 14
+        })
+    except Exception as e:
+        print(f"[WARN] Failed to add legend: {e}")
+
+    view.zoomTo()
+    return view
 
 
 if __name__ == '__main__':

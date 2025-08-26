@@ -3,11 +3,45 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
-from transformers import RobertaModel, RobertaTokenizer
+from evodiff.pretrained import OA_DM_38M
+from evodiff.generate import generate_oaardm
 
-from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX, PAD_IDX
+from constants import MAX_TRAINING_SIZE, AMINO_ACID_TO_INDEX
 from strategies.base import Base
 from utils.utils import get_blosum_probability_function
+
+
+class DiffusionTransformer(nn.Module):
+    def __init__(self, vocab_size, d_model=256, nhead=8, num_layers=6, dim_feedforward=512, dropout=0.1, max_len=512):
+        super().__init__()
+        self.token_embedding = nn.Embedding(vocab_size, d_model)
+        self.timestep_embedding = nn.Embedding(max_len, d_model)  # Large enough for all t
+        self.position_embedding = nn.Embedding(max_len, d_model)
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout, batch_first=True
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.layer_norm = nn.LayerNorm(d_model)
+        self.output_layer = nn.Linear(d_model, vocab_size)
+
+    def forward(self, x, t):
+        """
+        x: (batch_size, seq_len) -> input tokens (can include masked tokens)
+        t: (batch_size,) -> timestep conditioning
+        """
+        batch_size, seq_len = x.size()
+
+        tok_emb = self.token_embedding(x)                     # (batch, seq, d_model)
+        pos_emb = self.position_embedding(
+            torch.arange(seq_len, device=x.device).unsqueeze(0).expand(batch_size, -1)
+        )
+        time_emb = self.timestep_embedding(t).unsqueeze(1).expand(-1, seq_len, -1)
+
+        x = tok_emb + pos_emb + time_emb
+        x = self.encoder(x)
+        x = self.layer_norm(x)
+        return self.output_layer(x)
 
 
 class SequenceDiffusion(Base):
@@ -16,77 +50,65 @@ class SequenceDiffusion(Base):
         self.get_prob_vec, self.aa_list = get_blosum_probability_function()
         self.aa_to_idx = {aa: i for i, aa in enumerate(self.aa_list)}
         self.idx_to_aa = {i: aa for aa, i in self.aa_to_idx.items()}
-        self.noise_levels = 3
 
-        self.vocab_size = len(AMINO_ACID_TO_INDEX)
-        self.roberta = RobertaModel.from_pretrained("distilroberta-base")
-        self.lm_head = nn.Linear(self.roberta.config.hidden_size, self.vocab_size)
-        self.loss_fn = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
+        #checkpoint = OA_DM_38M()
+        #self.model, _, self.tokenizer, _ = checkpoint
+        self.tokenizer = OA_DM_38M()[2]
+        vocab_size = len(self.tokenizer.alphabet)
+        self.model = DiffusionTransformer(vocab_size=vocab_size)
+        self.pad_id = self.tokenizer.pad_id
+        self.mask_id = self.tokenizer.mask_id
+        self.model.train()
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.model.to(self.device)
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=self.pad_id)
 
-    def pad_sequence(self, sequence):
-        tokenized = [AMINO_ACID_TO_INDEX.get(aa, PAD_IDX) for aa in sequence]
-        padded = tokenized[:MAX_TRAINING_SIZE] + [PAD_IDX] * (MAX_TRAINING_SIZE - len(tokenized))
+    def tokenize_and_padd(self, sequence):
+        tokenized = list(self.tokenizer.tokenize([sequence]))
+        padded = tokenized[:MAX_TRAINING_SIZE] + [self.pad_id] * (MAX_TRAINING_SIZE - len(tokenized))
         return padded
 
-    def add_noise(self, sequence, t=1, reduce_odds=0.25, addition_odds=0.75):
-        """sequence: list of amino acid **letters**"""
-        s = list(sequence)
+    def add_noise(self, input_tensor):
+        L = input_tensor.size(0)
+        t = random.randint(0, L)
 
-        for _ in range(t):
-            # For all valid amino acids, get their prob vectors
-            prob_vectors = [self.get_prob_vec(aa) for aa in s]
-            prob_tensor = torch.tensor(np.stack(prob_vectors))  # (n_valid, vocab_size)
+        order = list(range(L))
+        random.shuffle(order)
 
-            # Sample replacements
-            replacements = torch.multinomial(prob_tensor, num_samples=1).squeeze(-1)
-            s = [self.aa_list[idx] for idx in replacements]
+        masked_indices = set(order[:t])
+        noised = [
+            self.mask_id if i in masked_indices else input_tensor[i].item()
+            for i in range(L)
+        ]
 
-            # Randomly remove one AA from end
-            if len(s) > 0 and random.random() < reduce_odds:
-                s = s[:-1]
-
-            # Randomly add one AA to end
-            if random.random() < addition_odds:
-                s.append(random.choice(self.aa_list))
-
-        return "".join(s)
+        return torch.tensor(noised, dtype=torch.long), t
 
     def load_inputs_and_ground_truth(self, batch_data, t=1):
-        sequences = []
-        noised_sequences = []
+        gt_tensors = []
+        noised_tensors = []
         timesteps = []
 
         for data in batch_data:
-            timestep = (
-                random.randint(1, self.noise_levels)
-                if self.training or t is None else t
-            )
-            noised_seq = self.add_noise(data['sequence'], t=timestep)
+            padded_tensor = torch.tensor(self.tokenize_and_padd(data['sequence']), dtype=torch.long)
+            noised_tensor, timestep = self.add_noise(padded_tensor)
 
-            sequences.append(torch.tensor(self.pad_sequence(data['sequence']), dtype=torch.long))
-            noised_sequences.append(torch.tensor(self.pad_sequence(noised_seq), dtype=torch.long))
+            gt_tensors.append(padded_tensor)
+            noised_tensors.append(noised_tensor)
             timesteps.append(timestep)
 
-        sequences = torch.stack(sequences).to(self.device)
-        noised_sequences = torch.stack(noised_sequences).to(self.device)
+        gt_tensors = torch.stack(gt_tensors).to(self.device)
+        noised_tensors = torch.stack(noised_tensors).to(self.device)
         timesteps = torch.tensor(timesteps, dtype=torch.long).to(self.device)
 
-        return (noised_sequences, timesteps), sequences
+        return (noised_tensors, timesteps), gt_tensors
 
     def forward(self, inputs):
-        """
-        Forward pass to reconstruct the original sequence from the noised input.
-        """
-        (noised_sequences, timesteps) = inputs
-        embeddings = self.roberta.embeddings(input_ids=noised_sequences)
-        outputs = self.roberta.encoder(embeddings)
-        hidden_states = outputs[0]  # (batch_size, seq_len, hidden_size)
-        logits = self.lm_head(hidden_states)
+        noised_sequences, timesteps = inputs
+        logits = self.model(noised_sequences, timesteps)
         return logits
 
     def compute_loss(self, outputs, ground_truth):
-        return self.loss_fn(outputs.view(-1, self.vocab_size), ground_truth.view(-1))
+        return self.loss_fn(outputs.reshape(-1, outputs.size(-1)), ground_truth.reshape(-1))
 
     def evaluate(self, batch_data):
         """
